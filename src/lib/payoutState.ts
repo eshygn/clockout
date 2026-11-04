@@ -29,6 +29,16 @@ export function isTerminalBatch(status: string): boolean {
   return status === "SUCCESS" || status === "DENIED" || status === "CANCELED";
 }
 
+/** Plain-English reason for a PayPal item error name. */
+export function describeItemError(error: string | null): string | null {
+  if (!error) return null;
+  if (error.startsWith("SELF_PAY_NOT_ALLOWED")) return "PayPal won't let an account pay itself: use the worker's own PayPal email";
+  if (error.startsWith("RECEIVER_UNREGISTERED")) return "No PayPal account at this address yet";
+  if (error.startsWith("RECEIVER_UNCONFIRMED")) return "Receiver hasn't confirmed their PayPal account";
+  if (error.startsWith("RECEIVER_ACCOUNT_LOCKED")) return "Receiver's PayPal account is locked";
+  return error.split(":")[0].replace(/_/g, " ").toLowerCase();
+}
+
 export function describeItemStatus(status: string): string {
   switch (status) {
     case "SUCCESS":

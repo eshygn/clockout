@@ -203,7 +203,15 @@ export async function retryPayout(itemId: string, newEmail?: string) {
   const adapter = await payouts();
   if (needsCancelBeforeRetry(item.status) && item.paypalItemId) {
     // Unclaimed money is still out with PayPal: cancel it first so it returns before we resend.
-    const cancelled = await adapter.cancelItem(item.paypalItemId);
+    let cancelled;
+    try {
+      cancelled = await adapter.cancelItem(item.paypalItemId);
+    } catch (e) {
+      // Never re-send while the first payout can still be claimed: that could pay twice.
+      throw new Error(
+        `PayPal couldn't cancel the unclaimed payout yet (${(e as Error).message.split(":")[0]}), so nothing was re-sent. Try again shortly. Unclaimed money returns to you automatically after 30 days.`,
+      );
+    }
     updateItem(item.id, { status: cancelled.transaction_status, error: "Cancelled and re-sent" });
   } else {
     updateItem(item.id, { error: `${item.error ?? item.status}; re-sent` });

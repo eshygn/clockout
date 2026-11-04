@@ -67,7 +67,12 @@ describe("demo story (mock mode)", () => {
     const sent = await m.payouts.approveAndPay(gala.map((s) => s.id));
     expect(sent?.count).toBe(3);
     await m.payouts.refreshPayouts();
-    expect(m.repo.getShifts().filter((s) => s.start === "2026-11-13T16:00").every((s) => s.status === "paid")).toBe(true);
+    expect(
+      m.repo
+        .getShifts()
+        .filter((s) => s.start === "2026-11-13T16:00")
+        .every((s) => s.status === "paid"),
+    ).toBe(true);
 
     const owed = m.repo.getShifts().filter((s) => ["completed", "approved", "paying", "failed"].includes(s.status));
     expect(owed).toEqual([]);

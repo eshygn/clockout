@@ -62,3 +62,12 @@ describe("PayPal payout item status mapping", () => {
     expect(describeItemStatus("UNCLAIMED")).toMatch(/no PayPal account/);
   });
 });
+
+describe("PayPal error wording", async () => {
+  const { describeItemError } = await import("@/lib/payoutState");
+  it("explains self-pay and unregistered receivers", () => {
+    expect(describeItemError("SELF_PAY_NOT_ALLOWED: Payment to self is not allowed.")).toMatch(/pay itself/);
+    expect(describeItemError("RECEIVER_UNREGISTERED: x")).toMatch(/No PayPal account/);
+    expect(describeItemError(null)).toBeNull();
+  });
+});

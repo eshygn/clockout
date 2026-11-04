@@ -12,10 +12,14 @@ import { assignShiftsInput, recordConstraintsInput, type AssignShiftsInput, type
  * reports which path the last call took.
  */
 const FALLBACK_MODEL = "gemini-2.5-flash";
-const RPM = Number(process.env.AI_RPM || 8);
+const RPM = Number(process.env.AI_RPM || 12);
 
 interface AiState {
   model: string | null;
+  /** Newest-first Flash models to try; free-tier quota differs per model and changes often. */
+  candidates: string[] | null;
+  /** Models that answered "quota exceeded", with the time to try them again. */
+  exhausted: Record<string, number>;
   mode: "live" | "recorded";
   detail: string;
   calls: number[];
@@ -30,10 +34,17 @@ function state(): AiState {
     const key = process.env.GOOGLE_GENERATIVE_AI_API_KEY;
     globalThis.__clockoutAi =
       key && process.env.CLOCKOUT_FORCE_MOCK !== "1"
-        ? { model: process.env.AI_MODEL || null, mode: "live", detail: "Gemini", calls: [] }
-        : { model: null, mode: "recorded", detail: key ? "Recorded (forced)" : "Recorded: no Gemini key set", calls: [] };
+        ? { model: process.env.AI_MODEL || null, candidates: null, exhausted: {}, mode: "live", detail: "Gemini", calls: [] }
+        : {
+            model: null,
+            candidates: [],
+            exhausted: {},
+            mode: "recorded",
+            detail: key ? "Recorded (forced)" : "Recorded: no Gemini key set",
+            calls: [],
+          };
   }
-  return globalThis.__clockoutAi;
+  return globalThis.__clockoutAi!;
 }
 
 export function aiStatus() {
@@ -45,31 +56,43 @@ export function aiStatus() {
  * AI_MODEL wins. Otherwise ask the Gemini API which models exist and take the newest
  * stable "gemini-N.N-flash" that supports generateContent (the free-tier Flash line).
  */
-export function pickNewestFlash(names: string[]): string | null {
-  const parsed = names
-    .map((n) => n.replace(/^models\//, ""))
-    .map((n) => ({ n, m: /^gemini-(\d+)(?:\.(\d+))?-flash$/.exec(n) }))
-    .filter((x) => x.m)
-    .map((x) => ({ n: x.n, v: Number(x.m![1]) * 100 + Number(x.m![2] ?? 0) }))
-    .sort((a, b) => b.v - a.v);
-  return parsed[0]?.n ?? null;
+/** Stable "gemini-N.N-flash" ids newest first, then the "-flash-lite" line as a last resort (separate free quota). */
+export function rankFlashModels(names: string[]): string[] {
+  const rank = (re: RegExp) =>
+    names
+      .map((n) => n.replace(/^models\//, ""))
+      .map((n) => ({ n, m: re.exec(n) }))
+      .filter((x) => x.m)
+      .map((x) => ({ n: x.n, v: Number(x.m![1]) * 100 + Number(x.m![2] ?? 0) }))
+      .sort((a, b) => b.v - a.v)
+      .map((x) => x.n);
+  return [...rank(/^gemini-(\d+)(?:\.(\d+))?-flash$/), ...rank(/^gemini-(\d+)(?:\.(\d+))?-flash-lite$/)];
 }
 
-async function resolveModel(): Promise<string> {
+export function pickNewestFlash(names: string[]): string | null {
+  return rankFlashModels(names)[0] ?? null;
+}
+
+async function candidateModels(): Promise<string[]> {
   const s = state();
-  if (s.model) return s.model;
-  try {
-    const res = await fetch("https://generativelanguage.googleapis.com/v1beta/models?pageSize=1000", {
-      headers: { "x-goog-api-key": process.env.GOOGLE_GENERATIVE_AI_API_KEY! },
-      signal: AbortSignal.timeout(8000),
-    });
-    const json = (await res.json()) as { models?: { name: string; supportedGenerationMethods?: string[] }[] };
-    const names = (json.models ?? []).filter((m) => m.supportedGenerationMethods?.includes("generateContent")).map((m) => m.name);
-    s.model = pickNewestFlash(names) ?? FALLBACK_MODEL;
-  } catch {
-    s.model = FALLBACK_MODEL;
+  if (process.env.AI_MODEL) return [process.env.AI_MODEL];
+  if (!s.candidates) {
+    try {
+      const res = await fetch("https://generativelanguage.googleapis.com/v1beta/models?pageSize=1000", {
+        headers: { "x-goog-api-key": process.env.GOOGLE_GENERATIVE_AI_API_KEY! },
+        signal: AbortSignal.timeout(8000),
+      });
+      const json = (await res.json()) as { models?: { name: string; supportedGenerationMethods?: string[] }[] };
+      const names = (json.models ?? []).filter((m) => m.supportedGenerationMethods?.includes("generateContent")).map((m) => m.name);
+      s.candidates = rankFlashModels(names).slice(0, 8);
+    } catch {
+      s.candidates = [];
+    }
+    if (!s.candidates.length) s.candidates = [FALLBACK_MODEL];
   }
-  return s.model;
+  // Prefer the model that last worked, then newest first, skipping ones out of quota.
+  const ordered = s.model ? [s.model, ...s.candidates.filter((m) => m !== s.model)] : s.candidates;
+  return ordered.filter((m) => (s.exhausted[m] ?? 0) < Date.now());
 }
 
 function cacheKey(parts: unknown): string {
@@ -124,40 +147,59 @@ async function callTool<S extends z.ZodType, T = z.infer<S>>(opts: {
   const s = state();
   if (s.mode !== "live") return { value: opts.fallback(), source: "recorded", cached: false };
 
-  const model = await resolveModel();
-  const key = cacheKey([model, opts.name, opts.instructions, opts.prompt]);
+  // Keyed on the request, not the model, so a cached answer is reused whichever model gave it.
+  const key = cacheKey([opts.name, opts.instructions, opts.prompt]);
   const hit = cacheGet<T>(key);
   if (hit) return { value: hit, source: "gemini", cached: true };
 
-  if (!takeToken(s)) {
-    s.detail = `Recorded: local limit of ${RPM} calls/min reached`;
+  const models = (await candidateModels()).slice(0, 8);
+  if (!models.length) {
+    s.detail = "Recorded: Gemini free tier rate-limited";
     return { value: opts.fallback(), source: "recorded", cached: false };
   }
-
-  try {
-    const google = createGoogleGenerativeAI({ apiKey: process.env.GOOGLE_GENERATIVE_AI_API_KEY });
-    const result = await generateText({
-      model: google(model),
-      instructions: opts.instructions,
-      prompt: opts.prompt,
-      tools: { [opts.name]: tool({ description: opts.description, inputSchema: opts.schema }) },
-      toolChoice: { type: "tool", toolName: opts.name },
-      maxRetries: 1,
-      timeout: 45_000,
-    });
-    const call = result.toolCalls.find((c) => c.toolName === opts.name);
-    if (!call) throw new Error("Model did not call the tool");
-    const value = opts.schema.parse(call.input) as T;
-    cachePut(key, value);
-    s.detail = `Gemini · ${model}`;
-    return { value, source: "gemini", cached: false };
-  } catch (e) {
-    s.detail = isRateLimit(e)
-      ? "Recorded: Gemini free tier rate-limited"
-      : `Recorded: Gemini error (${String((e as Error).message).slice(0, 60)})`;
-    console.warn("[ai] falling back to recorded response:", (e as Error).message);
-    return { value: opts.fallback(), source: "recorded", cached: false };
+  const google = createGoogleGenerativeAI({ apiKey: process.env.GOOGLE_GENERATIVE_AI_API_KEY });
+  for (const model of models) {
+    if (!takeToken(s)) {
+      s.detail = `Recorded: local limit of ${RPM} calls/min reached`;
+      return { value: opts.fallback(), source: "recorded", cached: false };
+    }
+    const started = Date.now();
+    try {
+      const result = await generateText({
+        model: google(model),
+        instructions: opts.instructions,
+        prompt: opts.prompt,
+        tools: { [opts.name]: tool({ description: opts.description, inputSchema: opts.schema }) },
+        toolChoice: { type: "tool", toolName: opts.name },
+        maxRetries: 0,
+        timeout: 30_000,
+        // Structured extraction, not open reasoning: minimal thinking keeps the demo snappy.
+        providerOptions: { google: { thinkingConfig: { thinkingLevel: "minimal" } } },
+      });
+      const call = result.toolCalls.find((c) => c.toolName === opts.name);
+      if (!call) throw new Error("Model did not call the tool");
+      console.info(`[ai] ${opts.name} answered by ${model} in ${Date.now() - started}ms`);
+      const value = opts.schema.parse(call.input) as T;
+      cachePut(key, value);
+      s.model = model;
+      s.detail = `Gemini · ${model}`;
+      return { value, source: "gemini", cached: false };
+    } catch (e) {
+      if (isRateLimit(e)) {
+        // Out of quota on this model: park it for a few minutes and try the next Flash model down.
+        s.exhausted[model] = Date.now() + 5 * 60_000;
+        s.detail = "Recorded: Gemini free tier rate-limited";
+        const body = String((e as { responseBody?: string }).responseBody ?? (e as Error).message);
+        const quota = /"quotaId":\s*"([^"]+)"/.exec(body)?.[1] ?? "";
+        console.warn(`[ai] ${model} is rate-limited${quota ? ` (${quota})` : ""}; trying the next model`);
+        continue;
+      }
+      s.detail = `Recorded: Gemini error (${String((e as Error).message).slice(0, 60)})`;
+      console.warn("[ai] falling back to recorded response:", (e as Error).message);
+      return { value: opts.fallback(), source: "recorded", cached: false };
+    }
   }
+  return { value: opts.fallback(), source: "recorded", cached: false };
 }
 
 export function extractConstraints(args: {

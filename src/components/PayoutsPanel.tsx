@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { payForShift } from "@/lib/money";
-import { describeItemStatus, outcomeOf } from "@/lib/payoutState";
+import { describeItemError, describeItemStatus, outcomeOf } from "@/lib/payoutState";
 import { durationMinutes, formatRange } from "@/lib/time";
 import type { AppState, PayoutItem } from "@/lib/types";
 import { Avatar, Icon, Money } from "./ui";
@@ -234,6 +234,7 @@ function RetryRow({
           <span>
             {describeItemStatus(item.status)} · <code>{item.receiver}</code>
           </span>
+          {item.error && item.status !== "UNCLAIMED" && <span className="retry-why">{describeItemError(item.error)}</span>}
         </div>
         <Money minor={item.amountMinor} currency={item.currency} />
       </div>
