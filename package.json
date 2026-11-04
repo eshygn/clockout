@@ -7,11 +7,13 @@
   "scripts": {
     "bryntum:auth": "bash scripts/bryntum-auth.sh",
     "dev": "next dev -p ${PORT:-3000}",
+    "dev:mock": "CLOCKOUT_FORCE_MOCK=1 next dev -p ${PORT:-3000}",
     "build": "next build",
     "start": "next start -p ${PORT:-3000}",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "check": "npm run lint && npm run typecheck && npm test && npm run build"
   },
   "engines": {
     "node": ">=20"

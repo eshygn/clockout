@@ -24,7 +24,7 @@ export function WorkerWeek({ state }: { state: AppState }) {
         startDate: wallToDate(s.start),
         endDate: wallToDate(s.end),
         resourceId: workerId,
-        eventColor: worker.color,
+        eventColor: s.status === "paid" ? "#0F8A58" : worker.color,
         cls: `co-cal co-${s.status}`,
         readOnly: true,
         status: s.status,
@@ -42,7 +42,7 @@ export function WorkerWeek({ state }: { state: AppState }) {
         cls: "co-cal-block",
         readOnly: true,
         allDay: false,
-        detail: "From their message",
+        detail: "from their message",
       }));
     return [...shifts, ...blocks];
   }, [state, workerId, worker.color, ccy]);

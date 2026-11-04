@@ -1,0 +1,33 @@
+# Render Blueprint: one free web service running the whole Next.js app.
+# Docs: https://render.com/docs/blueprint-spec
+services:
+  - type: web
+    name: clockout
+    runtime: node
+    plan: free
+    region: oregon
+    # Bryntum trial packages come from Bryntum's private registry, so log in first.
+    # The script writes ~/.npmrc on the build machine only.
+    buildCommand: bash scripts/bryntum-auth.sh && npm ci && npm run build
+    startCommand: npm start
+    healthCheckPath: /api/state
+    autoDeploy: true
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: BRYNTUM_EMAIL
+        sync: false
+      - key: PAYPAL_CLIENT_ID
+        sync: false
+      - key: PAYPAL_CLIENT_SECRET
+        sync: false
+      - key: PAYPAL_SANDBOX_RECEIVER_EMAIL
+        sync: false
+      - key: PAYPAL_SANDBOX_BUYER_EMAIL
+        sync: false
+      - key: GOOGLE_GENERATIVE_AI_API_KEY
+        sync: false
+      - key: AI_MODEL
+        sync: false
+      - key: CLOCKOUT_CURRENCY
+        value: USD

@@ -1118,16 +1118,27 @@ rect.b-series-effort.co-over {
 .co-cal-detail {
   font-size: 11px;
   opacity: 0.85;
-  text-transform: capitalize;
 }
-.b-cal-event-wrap.co-cal-block .b-cal-event {
-  background: repeating-linear-gradient(135deg, rgba(196, 53, 43, 0.12) 0 5px, rgba(255, 255, 255, 0.6) 5px 11px) !important;
+.b-cal-event-wrap.co-cal-block .b-cal-event-body {
+  background: repeating-linear-gradient(135deg, rgba(196, 53, 43, 0.12) 0 5px, rgba(255, 255, 255, 0.7) 5px 11px) !important;
   color: #a2382f !important;
-  border: 1px dashed rgba(196, 53, 43, 0.5) !important;
+  border: 1px dashed rgba(196, 53, 43, 0.45) !important;
 }
-.b-cal-event-wrap.co-paid .b-cal-event {
+.b-cal-event-wrap.co-paid .b-cal-event-body {
   background: var(--paid) !important;
   color: #fff !important;
+}
+.b-cal-event-wrap.co-completed .b-cal-event-body {
+  background: var(--owed-soft) !important;
+  color: #6b4500 !important;
+}
+.b-cal-event-wrap.co-paying .b-cal-event-body {
+  background: var(--paying-soft) !important;
+  color: #0b3f8c !important;
+}
+.b-cal-event-wrap.co-failed .b-cal-event-body {
+  background: var(--failed-soft) !important;
+  color: #8d1f17 !important;
 }
 
 /* ───────────────────────── Payouts ───────────────────────── */
