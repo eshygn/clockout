@@ -146,7 +146,10 @@ export async function refreshPayouts() {
   const adapter = await payouts();
   const items = getItems();
   const open = getBatches().filter(
-    (b) => b.paypalBatchId && b.mode === adapter.mode && (!isTerminalBatch(b.status) || items.some((i) => i.batchId === b.id && i.status === "PENDING")),
+    (b) =>
+      b.paypalBatchId &&
+      b.mode === adapter.mode &&
+      (!isTerminalBatch(b.status) || items.some((i) => i.batchId === b.id && i.status === "PENDING")),
   );
   let changed = 0;
   for (const b of open) {
@@ -168,10 +171,15 @@ export async function refreshPayouts() {
         const outcome = outcomeOf(d.transaction_status);
         if (outcome === "paid" && shift.status === "paying") {
           applyTransition(shift.id, "payout_succeeded");
-          logAction("payout", `Paid ${worker.name.split(" ")[0]} ${formatMoney(mine.amountMinor, mine.currency)} for ${shift.eventName}.`, "system", {
-            shiftId: shift.id,
-            workerId: worker.id,
-          });
+          logAction(
+            "payout",
+            `Paid ${worker.name.split(" ")[0]} ${formatMoney(mine.amountMinor, mine.currency)} for ${shift.eventName}.`,
+            "system",
+            {
+              shiftId: shift.id,
+              workerId: worker.id,
+            },
+          );
         } else if (outcome === "needs_attention" && shift.status === "paying") {
           applyTransition(shift.id, "payout_failed");
           logAction(

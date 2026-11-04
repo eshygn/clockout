@@ -34,9 +34,7 @@ export type ConstraintUpdate = z.infer<typeof constraintUpdate>;
 export const assignment = z.object({
   shiftId: z.string(),
   workerId: z.string(),
-  reason: z
-    .string()
-    .describe("One sentence for the owner explaining the pick, citing the worker's message, cost or hours"),
+  reason: z.string().describe("One sentence for the owner explaining the pick, citing the worker's message, cost or hours"),
 });
 
 export const assignShiftsInput = z.object({

@@ -82,21 +82,59 @@ export async function readMessages(): Promise<{ dropped: string[]; source: strin
   inTransaction(() => {
     for (const m of messages) {
       const worker = workers.find((w) => w.id === m.workerId)!;
-      const raw =
-        result.value.updates.find((u) => u.messageId === m.id) ??
-        recordedUpdate(m, worker, shifts, clock, biz.weekStart);
+      const raw = result.value.updates.find((u) => u.messageId === m.id) ?? recordedUpdate(m, worker, shifts, clock, biz.weekStart);
       const u = sanitizeUpdate(raw, worker.id, shifts);
       deleteConstraintsForMessage(m.id);
       let n = 0;
       const id = () => `${m.id}_${++n}`;
       for (const x of u.unavailable)
-        addConstraint({ id: id(), workerId: worker.id, messageId: m.id, kind: "unavailable", start: x.start, end: x.end, hours: null, role: null, note: x.note });
+        addConstraint({
+          id: id(),
+          workerId: worker.id,
+          messageId: m.id,
+          kind: "unavailable",
+          start: x.start,
+          end: x.end,
+          hours: null,
+          role: null,
+          note: x.note,
+        });
       for (const x of u.preferred)
-        addConstraint({ id: id(), workerId: worker.id, messageId: m.id, kind: "preferred", start: x.start, end: x.end, hours: null, role: null, note: x.note });
+        addConstraint({
+          id: id(),
+          workerId: worker.id,
+          messageId: m.id,
+          kind: "preferred",
+          start: x.start,
+          end: x.end,
+          hours: null,
+          role: null,
+          note: x.note,
+        });
       for (const r of u.preferredRoles)
-        addConstraint({ id: id(), workerId: worker.id, messageId: m.id, kind: "preferred_role", start: null, end: null, hours: null, role: r, note: `prefers ${r}` });
+        addConstraint({
+          id: id(),
+          workerId: worker.id,
+          messageId: m.id,
+          kind: "preferred_role",
+          start: null,
+          end: null,
+          hours: null,
+          role: r,
+          note: `prefers ${r}`,
+        });
       if (u.maxHours)
-        addConstraint({ id: id(), workerId: worker.id, messageId: m.id, kind: "max_hours", start: null, end: null, hours: u.maxHours, role: null, note: `max ${u.maxHours}h` });
+        addConstraint({
+          id: id(),
+          workerId: worker.id,
+          messageId: m.id,
+          kind: "max_hours",
+          start: null,
+          end: null,
+          hours: u.maxHours,
+          role: null,
+          note: `max ${u.maxHours}h`,
+        });
       markMessageProcessed(m.id, u.summary);
       logAction("read", `${first(worker)}: ${u.summary}`, result.source, { workerId: worker.id, messageId: m.id });
       for (const sid of u.dropShiftIds) {
@@ -135,7 +173,11 @@ export async function fillOpenShifts(opts: { onlyShiftIds?: string[] } = {}) {
   if (!open.length) return { filled: 0, rejected: 0, source: "none", summary: "No open shifts to fill." };
 
   const committed = shifts.filter((s) => s.workerId).reduce((a, s) => a + s.payMinor, 0);
-  const baseline = greedyPlan(ctx, biz.weeklyBudgetMinor, open.map((s) => s.id));
+  const baseline = greedyPlan(
+    ctx,
+    biz.weeklyBudgetMinor,
+    open.map((s) => s.id),
+  );
 
   const lines = open.map((s) => {
     const cands = candidatesFor(s, ctx)
@@ -195,10 +237,15 @@ export async function fillOpenShifts(opts: { onlyShiftIds?: string[] } = {}) {
       Object.assign(shift, saved);
       spent += saved.payMinor;
       filled++;
-      logAction("assign", `${first(worker)} → ${shift.eventName}, ${shift.role} ${formatRange(shift.start, shift.end)}. ${reason}`, source, {
-        shiftId,
-        workerId,
-      });
+      logAction(
+        "assign",
+        `${first(worker)} → ${shift.eventName}, ${shift.role} ${formatRange(shift.start, shift.end)}. ${reason}`,
+        source,
+        {
+          shiftId,
+          workerId,
+        },
+      );
       return true;
     };
 
@@ -207,7 +254,11 @@ export async function fillOpenShifts(opts: { onlyShiftIds?: string[] } = {}) {
     // Anything the model left unfilled or got blocked on: the guardrail planner fills it legally.
     const stillOpen = live.filter((s) => s.status === "open" && open.some((o) => o.id === s.id));
     if (stillOpen.length) {
-      const repair = greedyPlan({ workers, constraints, shifts: live }, biz.weeklyBudgetMinor, stillOpen.map((s) => s.id));
+      const repair = greedyPlan(
+        { workers, constraints, shifts: live },
+        biz.weeklyBudgetMinor,
+        stillOpen.map((s) => s.id),
+      );
       for (const p of repair) tryAssign(p.shiftId, p.workerId, p.reason, "guardrail");
     }
     const left = live.filter((s) => s.status === "open" && open.some((o) => o.id === s.id)).length;
