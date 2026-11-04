@@ -1,0 +1,51 @@
+{
+  "name": "clockout",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Clockout: AI-run rotas and instant PayPal payouts for freelance crews.",
+  "license": "MIT",
+  "scripts": {
+    "bryntum:auth": "bash scripts/bryntum-auth.sh",
+    "dev": "next dev -p ${PORT:-3000}",
+    "build": "next build",
+    "start": "next start -p ${PORT:-3000}",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@ai-sdk/google": "^4.0.111",
+    "@bryntum/calendar-react-thin": "7.3.8",
+    "@bryntum/calendar-thin": "npm:@bryntum/calendar-thin-trial@7.3.8",
+    "@bryntum/core-react-thin": "7.3.8",
+    "@bryntum/core-thin": "npm:@bryntum/core-thin-trial@7.3.8",
+    "@bryntum/engine-thin": "npm:@bryntum/engine-thin-trial@7.3.8",
+    "@bryntum/grid-thin": "npm:@bryntum/grid-thin-trial@7.3.8",
+    "@bryntum/scheduler-thin": "npm:@bryntum/scheduler-thin-trial@7.3.8",
+    "@bryntum/schedulerpro-react-thin": "7.3.8",
+    "@bryntum/schedulerpro-thin": "npm:@bryntum/schedulerpro-thin-trial@7.3.8",
+    "@fontsource-variable/bricolage-grotesque": "^5.3.0",
+    "@fontsource-variable/inter": "^5.3.0",
+    "@fontsource/ibm-plex-mono": "^5.3.0",
+    "@paypal/paypal-server-sdk": "^2.5.0",
+    "ai": "^7.0.162",
+    "better-sqlite3": "^13.0.3",
+    "next": "^16.4.5",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^9.6.0",
+    "@types/node": "^26.6.6",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "eslint": "^9.39.5",
+    "eslint-config-next": "^16.4.5",
+    "typescript": "^6.0.3",
+    "vitest": "^5.1.0"
+  }
+}
