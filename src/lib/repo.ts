@@ -103,7 +103,9 @@ export function getConstraints(): Constraint[] {
 
 export function addConstraint(c: Constraint) {
   db()
-    .prepare("INSERT OR REPLACE INTO constraints_ (id, worker_id, message_id, kind, start, end, hours, role, note) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)")
+    .prepare(
+      "INSERT OR REPLACE INTO constraints_ (id, worker_id, message_id, kind, start, end, hours, role, note) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+    )
     .run(c.id, c.workerId, c.messageId, c.kind, c.start, c.end, c.hours, c.role, c.note);
 }
 

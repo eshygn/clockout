@@ -1,12 +1,6 @@
 import { db } from "../db";
 import { fromDecimalString, sumMinor, toDecimalString } from "../money";
-import type {
-  CreatePayoutRequest,
-  CreatePayoutResponse,
-  PayoutBatchDetail,
-  PayoutItemDetail,
-  PayoutsAdapter,
-} from "./types";
+import type { CreatePayoutRequest, CreatePayoutResponse, PayoutBatchDetail, PayoutItemDetail, PayoutsAdapter } from "./types";
 import { PayPalApiError } from "./types";
 
 /**
@@ -101,7 +95,9 @@ function render(s: Stored): PayoutBatchDetail {
       fees: { currency, value: "0.00" },
     },
     items,
-    links: [{ href: `${BASE}/v1/payments/payouts/${s.batch_id}?page_size=1000&page=1`, rel: "self", method: "GET", encType: "application/json" }],
+    links: [
+      { href: `${BASE}/v1/payments/payouts/${s.batch_id}?page_size=1000&page=1`, rel: "self", method: "GET", encType: "application/json" },
+    ],
   };
 }
 
@@ -110,7 +106,11 @@ export class MockPayouts implements PayoutsAdapter {
 
   async createBatch(req: CreatePayoutRequest): Promise<CreatePayoutResponse> {
     const existing = db().prepare("SELECT json FROM mock_paypal").all() as { json: string }[];
-    if (existing.some((r) => (JSON.parse(r.json) as Stored).request.sender_batch_header.sender_batch_id === req.sender_batch_header.sender_batch_id)) {
+    if (
+      existing.some(
+        (r) => (JSON.parse(r.json) as Stored).request.sender_batch_header.sender_batch_id === req.sender_batch_header.sender_batch_id,
+      )
+    ) {
       throw new PayPalApiError(400, {
         name: "USER_BUSINESS_ERROR",
         message: "User business error.",

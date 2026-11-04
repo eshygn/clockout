@@ -34,7 +34,11 @@ export async function payouts(): Promise<PayoutsAdapter> {
       await st.adapter.accessToken();
       st.detail = "PayPal Sandbox";
     } catch (e) {
-      globalThis.__clockoutPayPal = { adapter: new MockPayouts(), detail: `Mock: sandbox unreachable (${(e as Error).message.slice(0, 60)})`, probed: true };
+      globalThis.__clockoutPayPal = {
+        adapter: new MockPayouts(),
+        detail: `Mock: sandbox unreachable (${(e as Error).message.slice(0, 60)})`,
+        probed: true,
+      };
     }
   }
   return globalThis.__clockoutPayPal!.adapter;

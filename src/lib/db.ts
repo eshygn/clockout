@@ -85,10 +85,14 @@ export function seed(conn: Database.Database = db()) {
       "INSERT INTO shifts (id, event_name, venue, role, start, end, worker_id, status, pay_minor) VALUES (?, ?, ?, ?, ?, ?, NULL, 'open', 0)",
     );
     for (const shift of SHIFTS) s.run(shift.id, shift.eventName, shift.venue, shift.role, shift.start, shift.end);
-    const m = conn.prepare("INSERT INTO messages (id, worker_id, body, received_at, processed_at, summary) VALUES (?, ?, ?, ?, NULL, NULL)");
+    const m = conn.prepare(
+      "INSERT INTO messages (id, worker_id, body, received_at, processed_at, summary) VALUES (?, ?, ?, ?, NULL, NULL)",
+    );
     for (const msg of MONDAY_MESSAGES) m.run(msg.id, msg.workerId, msg.body, msg.receivedAt);
     conn
-      .prepare("INSERT INTO actions (at, kind, text, shift_id, worker_id, message_id, source) VALUES (?, 'clock', ?, NULL, NULL, NULL, 'system')")
+      .prepare(
+        "INSERT INTO actions (at, kind, text, shift_id, worker_id, message_id, source) VALUES (?, 'clock', ?, NULL, NULL, NULL, 'system')",
+      )
       .run(DEMO_STEPS[0].at, "Demo ready: 18 open shifts across 5 events, 6 messages waiting.");
   });
   tx();

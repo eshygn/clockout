@@ -1,0 +1,9 @@
+/* Bryntum thin packages: FontAwesome + structural CSS for every thin product used + exactly one theme. */
+@import "@bryntum/core-thin/fontawesome/css/fontawesome.css";
+@import "@bryntum/core-thin/fontawesome/css/solid.css";
+@import "@bryntum/core-thin/core.css";
+@import "@bryntum/grid-thin/grid.css";
+@import "@bryntum/scheduler-thin/scheduler.css";
+@import "@bryntum/schedulerpro-thin/schedulerpro.css";
+@import "@bryntum/calendar-thin/calendar.css";
+@import "@bryntum/core-thin/svalbard-light.css";

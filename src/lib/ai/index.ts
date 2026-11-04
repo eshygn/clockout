@@ -1,13 +1,9 @@
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { generateText, tool } from "ai";
 import crypto from "node:crypto";
+import type { z } from "zod";
 import { db } from "../db";
-import {
-  assignShiftsInput,
-  recordConstraintsInput,
-  type AssignShiftsInput,
-  type RecordConstraintsInput,
-} from "./schemas";
+import { assignShiftsInput, recordConstraintsInput, type AssignShiftsInput, type RecordConstraintsInput } from "./schemas";
 
 /**
  * Every model call goes through here: a cache (SQLite, survives demo resets), a
@@ -32,9 +28,10 @@ declare global {
 function state(): AiState {
   if (!globalThis.__clockoutAi) {
     const key = process.env.GOOGLE_GENERATIVE_AI_API_KEY;
-    globalThis.__clockoutAi = key && process.env.CLOCKOUT_FORCE_MOCK !== "1"
-      ? { model: process.env.AI_MODEL || null, mode: "live", detail: "Gemini", calls: [] }
-      : { model: null, mode: "recorded", detail: key ? "Recorded (forced)" : "Recorded: no Gemini key set", calls: [] };
+    globalThis.__clockoutAi =
+      key && process.env.CLOCKOUT_FORCE_MOCK !== "1"
+        ? { model: process.env.AI_MODEL || null, mode: "live", detail: "Gemini", calls: [] }
+        : { model: null, mode: "recorded", detail: key ? "Recorded (forced)" : "Recorded: no Gemini key set", calls: [] };
   }
   return globalThis.__clockoutAi;
 }
@@ -85,7 +82,9 @@ function cacheGet<T>(key: string): T | null {
 }
 
 function cachePut(key: string, value: unknown) {
-  db().prepare("INSERT OR REPLACE INTO ai_cache (key, value, created_at) VALUES (?, ?, ?)").run(key, JSON.stringify(value), new Date().toISOString());
+  db()
+    .prepare("INSERT OR REPLACE INTO ai_cache (key, value, created_at) VALUES (?, ?, ?)")
+    .run(key, JSON.stringify(value), new Date().toISOString());
 }
 
 function takeToken(s: AiState): boolean {
@@ -114,10 +113,10 @@ export interface AiResult<T> {
  * Forces one tool call with a zod-validated input and returns that input.
  * `fallback` produces the recorded answer when the live path is unavailable.
  */
-async function callTool<T>(opts: {
+async function callTool<S extends z.ZodType, T = z.infer<S>>(opts: {
   name: string;
   description: string;
-  schema: typeof recordConstraintsInput | typeof assignShiftsInput;
+  schema: S;
   instructions: string;
   prompt: string;
   fallback: () => T;
@@ -153,7 +152,9 @@ async function callTool<T>(opts: {
     s.detail = `Gemini · ${model}`;
     return { value, source: "gemini", cached: false };
   } catch (e) {
-    s.detail = isRateLimit(e) ? "Recorded: Gemini free tier rate-limited" : `Recorded: Gemini error (${String((e as Error).message).slice(0, 60)})`;
+    s.detail = isRateLimit(e)
+      ? "Recorded: Gemini free tier rate-limited"
+      : `Recorded: Gemini error (${String((e as Error).message).slice(0, 60)})`;
     console.warn("[ai] falling back to recorded response:", (e as Error).message);
     return { value: opts.fallback(), source: "recorded", cached: false };
   }

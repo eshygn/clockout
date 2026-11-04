@@ -3,16 +3,7 @@
  * Statuses from the Payouts API reference: SUCCESS, FAILED, PENDING, UNCLAIMED, RETURNED,
  * ONHOLD, BLOCKED, REFUNDED, REVERSED.
  */
-export type PayPalItemStatus =
-  | "SUCCESS"
-  | "FAILED"
-  | "PENDING"
-  | "UNCLAIMED"
-  | "RETURNED"
-  | "ONHOLD"
-  | "BLOCKED"
-  | "REFUNDED"
-  | "REVERSED";
+export type PayPalItemStatus = "SUCCESS" | "FAILED" | "PENDING" | "UNCLAIMED" | "RETURNED" | "ONHOLD" | "BLOCKED" | "REFUNDED" | "REVERSED";
 
 export type PayoutOutcome = "in_flight" | "paid" | "needs_attention";
 
