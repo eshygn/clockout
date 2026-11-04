@@ -1576,3 +1576,8 @@ rect.b-series-effort.co-over {
 .co-res-open .co-res-roles {
   text-transform: none;
 }
+.retry-why {
+  font-size: 11px;
+  color: #8d1f17;
+  font-style: italic;
+}

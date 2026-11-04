@@ -54,12 +54,24 @@ export function paypalStatus(): { mode: "live" | "mock"; detail: string } {
 }
 
 /**
- * In live sandbox mode, pay a real sandbox account so payouts settle as SUCCESS:
- * PAYPAL_SANDBOX_BUYER_EMAIL stands in for every worker, except a deliberately
- * typo'd address (kept as-is so the unclaimed → retry flow is real too).
+ * Who actually receives a payout in live sandbox mode. The seeded workers' emails are
+ * fictional, and PayPal holds money sent to an address with no account as UNCLAIMED.
+ * So when PAYPAL_SANDBOX_RECEIVER_EMAIL (a sandbox *personal* account) is set, every
+ * worker is paid there and payouts settle as SUCCESS. PAYPAL_SANDBOX_BUYER_EMAIL is used
+ * the same way unless it is a business account (paying yourself fails with
+ * SELF_PAY_NOT_ALLOWED). A deliberately typo'd address is always kept as-is, so the
+ * unclaimed → cancel → retry flow is real too.
  */
+export function sandboxReceiver(): string | null {
+  const explicit = process.env.PAYPAL_SANDBOX_RECEIVER_EMAIL?.trim();
+  if (explicit) return explicit;
+  const buyer = process.env.PAYPAL_SANDBOX_BUYER_EMAIL?.trim();
+  if (buyer && !/@business\.example\.com$/i.test(buyer)) return buyer;
+  return null;
+}
+
 export function receiverFor(email: string, mode: "live" | "mock", looksBad: boolean): string {
-  const sandbox = process.env.PAYPAL_SANDBOX_BUYER_EMAIL;
+  const sandbox = sandboxReceiver();
   if (mode === "live" && sandbox && !looksBad) return sandbox;
   return email;
 }

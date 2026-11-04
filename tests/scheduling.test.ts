@@ -9,10 +9,57 @@ const workerFor: Record<string, string> = { m01: "w_maya", m02: "w_diego", m03: 
 const constraints: Constraint[] = Object.entries(RECORDED).flatMap(([mid, u]) => {
   const workerId = workerFor[mid];
   const out: Constraint[] = [];
-  u.unavailable.forEach((x, i) => out.push({ id: `${mid}u${i}`, workerId, messageId: mid, kind: "unavailable", start: x.start, end: x.end, hours: null, role: null, note: x.note }));
-  u.preferred.forEach((x, i) => out.push({ id: `${mid}p${i}`, workerId, messageId: mid, kind: "preferred", start: x.start, end: x.end, hours: null, role: null, note: x.note }));
-  u.preferredRoles.forEach((r, i) => out.push({ id: `${mid}r${i}`, workerId, messageId: mid, kind: "preferred_role", start: null, end: null, hours: null, role: r, note: "" }));
-  if (u.maxHours) out.push({ id: `${mid}h`, workerId, messageId: mid, kind: "max_hours", start: null, end: null, hours: u.maxHours, role: null, note: "" });
+  u.unavailable.forEach((x, i) =>
+    out.push({
+      id: `${mid}u${i}`,
+      workerId,
+      messageId: mid,
+      kind: "unavailable",
+      start: x.start,
+      end: x.end,
+      hours: null,
+      role: null,
+      note: x.note,
+    }),
+  );
+  u.preferred.forEach((x, i) =>
+    out.push({
+      id: `${mid}p${i}`,
+      workerId,
+      messageId: mid,
+      kind: "preferred",
+      start: x.start,
+      end: x.end,
+      hours: null,
+      role: null,
+      note: x.note,
+    }),
+  );
+  u.preferredRoles.forEach((r, i) =>
+    out.push({
+      id: `${mid}r${i}`,
+      workerId,
+      messageId: mid,
+      kind: "preferred_role",
+      start: null,
+      end: null,
+      hours: null,
+      role: r,
+      note: "",
+    }),
+  );
+  if (u.maxHours)
+    out.push({
+      id: `${mid}h`,
+      workerId,
+      messageId: mid,
+      kind: "max_hours",
+      start: null,
+      end: null,
+      hours: u.maxHours,
+      role: null,
+      note: "",
+    });
   return out;
 });
 
