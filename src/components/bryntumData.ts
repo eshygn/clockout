@@ -1,5 +1,5 @@
 import { formatMoney, payForShift } from "@/lib/money";
-import { checkAssignment, hoursFor, maxHoursFor } from "@/lib/scheduling";
+import { checkAssignment, checkShiftLength, hoursFor, maxHoursFor } from "@/lib/scheduling";
 import { isEditable } from "@/lib/shiftState";
 import { dateToWall, durationMinutes, hhmm, wallToDate } from "@/lib/time";
 import type { AppState, Shift } from "@/lib/types";
@@ -92,6 +92,8 @@ type EvLike = { startDate: Date; endDate: Date; id: unknown; get?: (f: string) =
 export function validateMove(state: AppState, eventId: string, resourceId: string, startDate: Date, endDate: Date) {
   const shift = state.shifts.find((s) => s.id === eventId);
   if (!shift) return { valid: false, message: "Unknown shift" };
+  const length = checkShiftLength(dateToWall(startDate), dateToWall(endDate));
+  if (length) return { valid: false, message: length };
   if (resourceId === OPEN_ROW) return { valid: true, message: "Back to open shifts" };
   const worker = state.workers.find((w) => w.id === resourceId);
   if (!worker) return { valid: false, message: "Unknown worker" };

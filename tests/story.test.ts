@@ -60,6 +60,14 @@ describe("demo story (mock mode)", () => {
     expect(m.repo.getShifts().filter((s) => s.status === "failed")).toEqual([]);
   });
 
+  it("Owner drops a booked worker: the agent finds someone else", async () => {
+    const sat = m.repo.getShifts().find((s) => s.start.startsWith("2026-11-14") && s.status === "booked")!;
+    const before = sat.workerId;
+    await m.agent.dropAndRefill(sat.id);
+    const after = m.repo.getShift(sat.id)!;
+    expect(after.workerId).not.toBe(before);
+  });
+
   it("Gala ends: three workers paid, nothing owed", async () => {
     await m.clock.jumpTo(2);
     const gala = m.repo.getShifts().filter((s) => s.start === "2026-11-13T16:00");

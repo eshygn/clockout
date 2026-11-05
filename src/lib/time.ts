@@ -55,8 +55,15 @@ export function hhmm(s: Wall): string {
   return s.slice(11, 16);
 }
 
-/** "Fri 16:00–23:30" */
+/** "Fri 16:00–23:30", "all day Sat", "Mon–Tue" */
 export function formatRange(start: Wall, end: Wall): string {
+  const s = toMin(start);
+  const e = toMin(end);
+  if (minuteOfDay(s) === 0 && minuteOfDay(e) === 0 && e > s) {
+    const days = (e - s) / 1440;
+    if (days === 1) return `all day ${dayName(start)}`;
+    if (Number.isInteger(days)) return `${dayName(start)}–${dayName(addMinutes(end, -1))}`;
+  }
   return `${dayName(start)} ${hhmm(start)}–${hhmm(end)}`;
 }
 

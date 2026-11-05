@@ -262,7 +262,7 @@ export async function fillOpenShifts(opts: { onlyShiftIds?: string[] } = {}) {
       for (const p of repair) tryAssign(p.shiftId, p.workerId, p.reason, "guardrail");
     }
     const left = live.filter((s) => s.status === "open" && open.some((o) => o.id === s.id)).length;
-    const summary = `${result.value.summary}${left ? ` ${left} shift${left > 1 ? "s" : ""} still need someone.` : ""}`;
+    const summary = `${result.value.summary}${left ? ` ${left} shift${left > 1 ? "s still need" : " still needs"} someone.` : ""}`;
     logAction("summary", summary, result.source);
     return { filled, rejected, source: result.source, summary };
   });
@@ -274,4 +274,36 @@ export async function runAgent() {
   const read = await readMessages();
   const fill = await fillOpenShifts(read.dropped.length && read.read === 1 ? { onlyShiftIds: read.dropped } : {});
   return { ...read, ...fill, ms: Date.now() - started };
+}
+
+/** Owner drops a booked worker from a shift and asks the agent for cover (never the same person). */
+export async function dropAndRefill(shiftId: string) {
+  const shift = getShifts().find((s) => s.id === shiftId);
+  if (!shift || shift.status !== "booked" || !shift.workerId) throw new Error("Only a booked shift can be dropped.");
+  const w = getWorkers().find((x) => x.id === shift.workerId)!;
+  inTransaction(() => {
+    applyTransition(shiftId, "unassign", { workerId: null });
+    // Record that the owner took this person off, so the agent can't book them straight back in.
+    addConstraint({
+      id: `owner_${shiftId}_${w.id}`,
+      workerId: w.id,
+      messageId: null,
+      kind: "unavailable",
+      start: shift.start,
+      end: shift.end,
+      hours: null,
+      role: null,
+      note: "taken off by owner",
+    });
+    logAction(
+      "unassign",
+      `Owner took ${first(w)} off ${shift.eventName} (${formatRange(shift.start, shift.end)}). Finding cover.`,
+      "owner",
+      {
+        shiftId,
+        workerId: w.id,
+      },
+    );
+  });
+  return fillOpenShifts({ onlyShiftIds: [shiftId] });
 }

@@ -118,6 +118,13 @@ function takeToken(s: AiState): boolean {
   return true;
 }
 
+/** Google's "model is overloaded" (503 / UNAVAILABLE): worth trying the next model, not a quota problem. */
+export function isOverloaded(e: unknown): boolean {
+  const err = e as { statusCode?: number; message?: string; lastError?: { statusCode?: number } };
+  const code = err?.statusCode ?? err?.lastError?.statusCode;
+  return code === 503 || /UNAVAILABLE|overloaded|high demand/i.test(String(err?.message ?? ""));
+}
+
 export function isRateLimit(e: unknown): boolean {
   const err = e as { statusCode?: number; message?: string; lastError?: { statusCode?: number }; cause?: unknown };
   const code = err?.statusCode ?? err?.lastError?.statusCode;
@@ -192,6 +199,12 @@ async function callTool<S extends z.ZodType, T = z.infer<S>>(opts: {
         const body = String((e as { responseBody?: string }).responseBody ?? (e as Error).message);
         const quota = /"quotaId":\s*"([^"]+)"/.exec(body)?.[1] ?? "";
         console.warn(`[ai] ${model} is rate-limited${quota ? ` (${quota})` : ""}; trying the next model`);
+        continue;
+      }
+      if (isOverloaded(e)) {
+        s.exhausted[model] = Date.now() + 60_000;
+        s.detail = "Recorded: Gemini overloaded";
+        console.warn(`[ai] ${model} is overloaded; trying the next model`);
         continue;
       }
       s.detail = `Recorded: Gemini error (${String((e as Error).message).slice(0, 60)})`;

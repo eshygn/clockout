@@ -1516,6 +1516,7 @@ rect.b-series-effort.co-over {
     display: none;
   }
   .chips {
+    flex: 1 1 100%;
     flex-wrap: wrap;
   }
   .grid {

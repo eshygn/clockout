@@ -30,7 +30,11 @@ export function Dashboard() {
     );
   }
 
-  const hint = state.steps[state.step]?.hint;
+  const lastStep = state.step === state.steps.length - 1;
+  const settled =
+    state.items.some((i) => i.status === "SUCCESS") &&
+    !state.shifts.some((x) => ["completed", "approved", "paying", "failed"].includes(x.status));
+  const hint = lastStep && settled ? "Everyone who worked has been paid. Use Reset to run the story again." : state.steps[state.step]?.hint;
   const openCount = state.shifts.filter((s) => s.status === "open").length;
 
   return (

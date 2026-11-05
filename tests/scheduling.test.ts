@@ -87,6 +87,21 @@ describe("hard rules", () => {
   });
 });
 
+describe("shift length and wording", async () => {
+  const { checkShiftLength } = await import("@/lib/scheduling");
+  const { formatRange } = await import("@/lib/time");
+  it("refuses shifts over 14h or ending before they start", () => {
+    expect(checkShiftLength("2026-11-14T13:00", "2026-11-15T09:00")).toMatch(/14h/);
+    expect(checkShiftLength("2026-11-14T13:00", "2026-11-14T13:00")).toMatch(/end after/);
+    expect(checkShiftLength("2026-11-14T13:00", "2026-11-14T23:00")).toBeNull();
+  });
+  it("describes whole-day blocks plainly", () => {
+    expect(formatRange("2026-11-14T00:00", "2026-11-15T00:00")).toBe("all day Sat");
+    expect(formatRange("2026-11-09T00:00", "2026-11-11T00:00")).toBe("Mon–Tue");
+    expect(formatRange("2026-11-13T16:00", "2026-11-13T23:30")).toBe("Fri 16:00–23:30");
+  });
+});
+
 describe("baseline planner", () => {
   it("fills the week legally and within budget", () => {
     const ctx = { workers: WORKERS, shifts: shifts(), constraints };
