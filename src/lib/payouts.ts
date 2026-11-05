@@ -133,11 +133,14 @@ export async function approveAndPay(shiftIds: string[], label = "Approved hours"
   try {
     return await sendBatch(lines, label);
   } catch (e) {
+    // Nothing was sent, so nothing is half-paid: return the shifts to "hours to approve" for another try.
     inTransaction(() => {
-      for (const l of lines) applyTransition(l.shift.id, "payout_failed");
+      for (const l of lines) applyTransition(l.shift.id, "batch_rejected");
     });
-    logAction("payout", `PayPal rejected the batch: ${(e as Error).message}`, "system");
-    throw e;
+    const msg = (e as Error).message;
+    const hint = /INSUFFICIENT_FUNDS/.test(msg) ? " Add funds to the sandbox business account, then approve again." : "";
+    logAction("payout", `PayPal rejected the batch, nothing was sent: ${msg}${hint}`, "system");
+    throw new Error(`PayPal rejected the batch, nothing was sent: ${msg.split(":")[0]}.${hint}`);
   }
 }
 

@@ -27,16 +27,22 @@ export async function jumpTo(stepIndex: number) {
 
   if (step.id === "friday") {
     const earlier = ended.filter((s) => toMin(s.end) <= toMin("2026-11-13T00:00")).map((s) => s.id);
+    let payError: Error | null = null;
     if (earlier.length) {
-      await approveAndPay(earlier, "Mon–Thu hours (approved nightly)");
-      // Give the batch a moment to settle so Friday opens with Mon–Thu already paid.
-      for (let i = 0; i < 6; i++) {
-        await new Promise((r) => setTimeout(r, 700));
-        const r = await refreshPayouts();
-        if (!r.pending) break;
+      try {
+        await approveAndPay(earlier, "Mon–Thu hours (approved nightly)");
+        // Give the batch a moment to settle so Friday opens with Mon–Thu already paid.
+        for (let i = 0; i < 6; i++) {
+          await new Promise((r) => setTimeout(r, 700));
+          const r = await refreshPayouts();
+          if (!r.pending) break;
+        }
+      } catch (e) {
+        payError = e as Error; // shifts are back in "hours to approve"; the story carries on
       }
     }
     if (!getMessages().some((m) => m.id === SICK_CALL.id)) addMessage(SICK_CALL);
+    if (payError) throw new Error(`Clock moved to Friday, but ${payError.message}`);
   }
   return step;
 }

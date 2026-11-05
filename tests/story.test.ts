@@ -72,6 +72,22 @@ describe("demo story (mock mode)", () => {
     await m.clock.jumpTo(2);
     const gala = m.repo.getShifts().filter((s) => s.start === "2026-11-13T16:00");
     expect(gala.every((s) => s.status === "completed")).toBe(true);
+    // PayPal refuses the whole batch (e.g. sandbox balance empty): nothing sent, shifts go back to "hours to approve".
+    const { MockPayouts } = await import("@/lib/paypal/mock");
+    const { PayPalApiError } = await import("@/lib/paypal/types");
+    const real = MockPayouts.prototype.createBatch;
+    MockPayouts.prototype.createBatch = async () => {
+      throw new PayPalApiError(422, { name: "INSUFFICIENT_FUNDS", message: "Sender does not have sufficient funds." });
+    };
+    await expect(m.payouts.approveAndPay(gala.map((s) => s.id))).rejects.toThrow(/nothing was sent: INSUFFICIENT_FUNDS/);
+    MockPayouts.prototype.createBatch = real;
+    expect(
+      m.repo
+        .getShifts()
+        .filter((s) => s.start === "2026-11-13T16:00")
+        .every((s) => s.status === "completed"),
+    ).toBe(true);
+
     const sent = await m.payouts.approveAndPay(gala.map((s) => s.id));
     expect(sent?.count).toBe(3);
     await m.payouts.refreshPayouts();
