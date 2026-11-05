@@ -21,14 +21,16 @@ export type ShiftAction =
   | "send"
   | "payout_succeeded"
   | "payout_failed"
-  | "retry";
+  | "retry"
+  /** PayPal refused the whole batch, so nothing was sent: back to awaiting approval. */
+  | "batch_rejected";
 
 const TABLE: Record<ShiftStatus, Partial<Record<ShiftAction, ShiftStatus>>> = {
   open: { assign: "booked" },
   booked: { unassign: "open", reassign: "booked", complete: "completed" },
   completed: { approve: "approved", reopen: "booked" },
   approved: { send: "paying" },
-  paying: { payout_succeeded: "paid", payout_failed: "failed" },
+  paying: { payout_succeeded: "paid", payout_failed: "failed", batch_rejected: "completed" },
   failed: { retry: "paying" },
   paid: {},
 };

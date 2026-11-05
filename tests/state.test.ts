@@ -17,6 +17,10 @@ describe("shift state machine", () => {
     expect(transition("open", "assign")).toBe("booked");
   });
 
+  it("returns a rejected batch to awaiting approval", () => {
+    expect(transition("paying", "batch_rejected")).toBe("completed");
+  });
+
   it("supports failed payout and retry", () => {
     expect(transition("paying", "payout_failed")).toBe("failed");
     expect(transition("failed", "retry")).toBe("paying");

@@ -23,6 +23,8 @@ interface AiState {
   mode: "live" | "recorded";
   detail: string;
   calls: number[];
+  /** Models that rejected thinkingLevel "minimal". */
+  noMinimalThinking?: string[];
 }
 
 declare global {
@@ -180,8 +182,13 @@ async function callTool<S extends z.ZodType, T = z.infer<S>>(opts: {
         toolChoice: { type: "tool", toolName: opts.name },
         maxRetries: 0,
         timeout: 30_000,
-        // Structured extraction, not open reasoning: minimal thinking keeps the demo snappy.
-        providerOptions: { google: { thinkingConfig: { thinkingLevel: "minimal" } } },
+        // Structured extraction, not open reasoning: keep thinking minimal so the demo stays snappy.
+        providerOptions: {
+          google: {
+            // Gemini 3.x takes thinkingLevel; older models (2.5) reject it and take a zero thinking budget instead.
+            thinkingConfig: s.noMinimalThinking?.includes(model) ? { thinkingBudget: 0 } : { thinkingLevel: "minimal" as const },
+          },
+        },
       });
       const call = result.toolCalls.find((c) => c.toolName === opts.name);
       if (!call) throw new Error("Model did not call the tool");
@@ -201,7 +208,14 @@ async function callTool<S extends z.ZodType, T = z.infer<S>>(opts: {
         console.warn(`[ai] ${model} is rate-limited${quota ? ` (${quota})` : ""}; trying the next model`);
         continue;
       }
-      if (isOverloaded(e)) {
+      if (/thinking level/i.test(String((e as Error).message)) && !s.noMinimalThinking?.includes(model)) {
+        // Some models reject thinkingLevel "minimal": remember that and retry this model without it.
+        s.noMinimalThinking = [...(s.noMinimalThinking ?? []), model];
+        models.splice(models.indexOf(model) + 1, 0, model);
+        console.warn(`[ai] ${model} rejects minimal thinking; retrying without it`);
+        continue;
+      }
+      if (isOverloaded(e) || /aborted due to timeout|timed? ?out/i.test(String((e as Error).message))) {
         s.exhausted[model] = Date.now() + 60_000;
         s.detail = "Recorded: Gemini overloaded";
         console.warn(`[ai] ${model} is overloaded; trying the next model`);
