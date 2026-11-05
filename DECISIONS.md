@@ -19,6 +19,8 @@ These are the choices made while building Clockout, and why. Where the brief was
 
 - **Thin packages** (`*-thin-trial` via npm aliases) instead of the regular bundles. Scheduler Pro and Calendar can then share one page and one core, which the regular packages forbid ("bundle loaded multiple times").
 - **Scheduler Pro rather than Scheduler.** It brings the Resource Histogram (partnered and sharing the project), which the basic Scheduler lacks. Events are `manuallyScheduled` so the engine never moves a shift.
+- **The resize validator reads `eventRecord`, not `record`.** At runtime, Bryntum 7.3.8 passes `eventRecord` (and sometimes no `endDate`) to `eventResize.validatorFn`, although the shipped `.d.ts` names the field `record`. Following the types refused every resize; that was found and fixed in the final pass.
+- **Shifts are capped at 14 hours.** Because the axis hides 00:00–06:00, a small resize past 23:00 used to land at 09:00 the next day (a 20-hour, $800 shift). The cap is a hard rule, shared by the client and the server.
 - **Features are imported explicitly** (`bryntumFeatures.ts`). Turbopack tree-shakes Bryntum's barrel entry, so features that are only named in config don't register, and the app fails with "Feature 'resourceTimeRanges' not available".
 - **One source of truth.** Every mutation returns the full server state. The stores use `syncDataOnLoad`, so Bryntum applies only the differences and animates them. A drop or resize is validated client-side for instant feedback, then validated again on the server. If the server refuses, the bar snaps back.
 - **Non-continuous time axis** from 06:00 to 24:00, because no shift runs overnight in the seed data. The week zoom fits all seven days. The detail zoom is readable at 3-hour ticks.
@@ -31,6 +33,8 @@ These are the choices made while building Clockout, and why. Where the brief was
 - **Model choice.** `AI_MODEL` wins when set. Otherwise Clockout lists models from the Gemini API and ranks the stable `gemini-N.N-flash` ids newest first, then the `-flash-lite` line. On a quota error it parks that model for 5 minutes and tries the next one. (ai.google.dev's pricing page redirects to a host this build environment couldn't reach, so free-tier eligibility is discovered at runtime instead of hard-coded.) In testing on 4 Nov 2026, `gemini-3.8-flash` and `gemini-3.7-flash` returned `GenerateRequestsPerDayPerProjectPerModel-FreeTier` errors on this project, and `gemini-3.6-flash` and `gemini-3.5-flash` answered.
 - **Minimal thinking** (`thinkingLevel: "minimal"`). This is structured extraction, and the first unthrottled call took over 45 seconds without it.
 - **The cache survives Reset,** so recording the demo several times doesn't burn the daily quota. It is keyed on the request, not the model.
+- **Overload is not quota.** A 503 "high demand" parks that model for a minute and tries the next one, rather than falling straight back to recorded answers.
+- **"Drop & find cover" records the drop as a constraint.** Without it, the agent re-booked the person the owner had just removed (found in the final pass). The dropped worker is now unavailable for that slot.
 - **Recorded responses** for the six Monday messages are the tool-call arguments in the documented schema. A small rule-based reader handles unrecorded messages in mock mode, such as the Friday sick call or anything typed into the composer.
 
 ## PayPal
@@ -38,10 +42,21 @@ These are the choices made while building Clockout, and why. Where the brief was
 - **The server SDK for OAuth, REST for Payouts.** `@paypal/paypal-server-sdk` 2.5 has Orders, Payments, Vault, Subscriptions and Transaction Search controllers but no Payouts controller. Clockout uses the SDK's `clientCredentialsAuthManager` for tokens and calls Payouts v1 directly.
 - **One item per shift,** with `sender_item_id = <shiftId>-a<attempt>`. Status maps back to exactly one shift, and a retry is a new attempt with a new id.
 - **Idempotency.** `sender_batch_id` is unique per send and is also sent as `PayPal-Request-Id`. A repeated request is rejected by PayPal rather than paid twice.
-- **Unclaimed retry cancels first.** In the live sandbox, `POST /v1/payments/payouts-item/{id}/cancel` returned `INTERNAL_SERVICE_ERROR` every time I tried (4 Nov 2026). Clockout then refuses to re-send and explains why, because re-sending while the first payout can still be claimed could pay twice. The mock implements the documented success path (`UNCLAIMED → RETURNED`).
+- **Unclaimed retry cancels first.** In the live sandbox, `POST /v1/payments/payouts-item/{id}/cancel` returned `INTERNAL_SERVICE_ERROR` every time I tried (4 and 5 Nov 2026). Clockout then refuses to re-send and explains why, because re-sending while the first payout can still be claimed could pay twice. The mock implements the documented success path (`UNCLAIMED → RETURNED`).
 - **Sandbox receiver.** In live testing, the provided `PAYPAL_SANDBOX_BUYER_EMAIL` was a business account: the same account as the API app. Every item failed with `SELF_PAY_NOT_ALLOWED`. Clockout now pays a sandbox **personal** account when `PAYPAL_SANDBOX_RECEIVER_EMAIL` is set, and ignores `@business.example.com` buyer emails. Otherwise it pays the workers' own (fictional) emails, which PayPal holds as `UNCLAIMED`. The plain-English error and the Retry box let the owner correct a receiver from the UI.
 - **Live versus mock.** At startup Clockout requests a sandbox token. Success means live. Otherwise, or if Payouts is refused with a 401/403, it switches to mock and the chip shows the reason.
 - **USD by default** for sandbox safety, configurable with `CLOCKOUT_CURRENCY`.
+
+## Known limitations (stated plainly)
+
+- **Live payouts have not been seen reaching `SUCCESS`.** Every live call works: OAuth, batch create, polling and settlement. But this environment had no sandbox personal account to receive the money. The provided `PAYPAL_SANDBOX_BUYER_EMAIL` is the API app's own business account, so items failed with `SELF_PAY_NOT_ALLOWED`. Without it, they go to the fictional seeded emails and come back `UNCLAIMED`. Setting `PAYPAL_SANDBOX_RECEIVER_EMAIL` to a sandbox personal account should make them succeed, but that is untested.
+- **Live unclaimed-retry is blocked by the sandbox.** `POST /v1/payments/payouts-item/{id}/cancel` returned `INTERNAL_SERVICE_ERROR` on every attempt (4 and 5 Nov 2026). Clockout refuses to re-send rather than risk paying twice. The full cancel-and-resend path is exercised only in mock mode and in tests.
+- **The Gemini free tier is small and changes daily.** On this key the newest Flash models had no free quota left, and one call hit a 503 "high demand". The cascade and the recorded fallback keep the demo working, but which model answers on the day is not predictable. The chip shows what happened.
+- **Mon–Thu are auto-approved by the Friday jump.** It's a demo shortcut, labelled as such in the payout history ("Mon–Thu hours (approved nightly)").
+- **No two-person swap.** Swaps are drop + refill + preference. The agent never moves someone already booked to make room.
+- **Phone layout is usable but not designed.** Columns stack and there's no horizontal page scroll, but Bryntum keeps the crew pane wide, so on a phone the timeline gets about half the screen.
+- **The histogram adds little.** Double-booking is already blocked, so it can never show over-allocation; it mostly confirms the load is even.
+- **No auth, single business.** Every visitor to the hosted demo shares one database. Reset affects everyone looking at it.
 
 ## Engineering
 

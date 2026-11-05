@@ -4,7 +4,7 @@
 
 ![Clockout: the week's rota on a Bryntum Scheduler Pro, the crew inbox and the agent's log on the left, PayPal payouts on the right](docs/screenshot.png)
 
-Small businesses that run crews of freelancers (event staffing agencies, cleaning contractors, film and production crews) lose their Sunday nights rebuilding the rota in a spreadsheet, and their crews wait two weeks or more for invoices to clear. Clockout fixes both ends of the week. Workers text availability and swaps in plain English ("can't do Sat, can take Tues eve"). An AI agent turns those texts into scheduling rules and runs the rota itself on a Bryntum Scheduler: it builds the week within budget, refills a sick call with the best available person in seconds, and explains every change. When a shift ends and the owner approves the hours, Clockout pays each worker straight away with **PayPal Payouts**, at their agreed rate with night and weekend rates, and the shift's bar on the schedule turns from *booked* to *paid*.
+Small businesses that run crews of freelancers (event staffing agencies, cleaning contractors, film and production crews) lose their Sunday nights rebuilding the rota in a spreadsheet, and their crews wait two weeks or more for invoices to clear. Clockout fixes both ends of the week. Workers text availability and changes in plain English ("can't do Sat, can take Tues eve"). An AI agent turns those texts into scheduling rules and runs the rota itself on a Bryntum Scheduler: it builds the week within budget, refills a sick call with the best available person in seconds, and explains every change. When a shift ends and the owner approves the hours, Clockout pays each worker straight away with **PayPal Payouts**, at their agreed rate with night and weekend rates, and the shift's bar on the schedule turns from *booked* to *paid*.
 
 **Why Payouts and not payroll?** The crew are independent contractors, not employees. They're self-employed freelancers who invoice per shift. PayPal positions Payouts for exactly this: paying many recipients at once, such as gig workers and freelancers. There's no payroll run to wait for. Approve hours, and the money moves.
 
@@ -28,10 +28,27 @@ Open http://localhost:3000. `npm run dev` also works with no keys at all: every 
 | Step | Click | What happens |
 | --- | --- | --- |
 | **Mon 06:00** | **Let the agent handle 6 new messages** | Gemini reads six messy texts into constraints (hatched red = can't work, green = asked for). Then it assigns all 18 shifts within the $4,200 budget, one sentence of reasoning per pick. Guardrails re-check every assignment. |
-| **Fri 07:30** | **Jump** (top bar) | Mon–Thu hours are approved and paid in one PayPal batch. Jonah's payout comes back **UNCLAIMED** (typo: `gmial.com`). Fix the email and hit **Retry**. Diego texts in sick. Click **Let the agent handle 1 new message**: he's taken off tonight's gala and the best free, qualified, under-cap person is booked in seconds. |
+| **Fri 07:30** | **Jump** (top bar) | The jump fast-forwards Mon–Thu: those hours are auto-approved (a demo shortcut) and paid in one PayPal batch. Jonah's payout comes back **UNCLAIMED** (typo: `gmial.com`). Fix the email and hit **Retry**. Diego texts in sick. Click **Let the agent handle 1 new message**: he's taken off tonight's gala and the best free, qualified, under-cap person is booked in seconds. |
 | **Fri 23:45** | **Jump**, then **Approve & pay 3 with PayPal** | The gala crew's bars stripe blue (*paying*), then turn green (*paid*). The payouts panel reconciles to **Nothing owed**. |
 
 **Reset** in the top bar puts everything back to Monday morning.
+
+### What works where (honest status)
+
+Tested on 4–5 Nov 2026, against the real Gemini API and the real PayPal sandbox:
+
+| | Mock mode (no keys) | Live: Gemini + PayPal sandbox |
+| --- | --- | --- |
+| AI reads messages, builds the week, refills the sick call | ✅ Recorded tool-call answers plus a small rule-based reader | ✅ Ran end to end on Gemini Flash. On this key, the free daily quota ran out on the newer Flash models, so the cascade answered with `gemini-3.6/3.5-flash` and `gemini-3.5-flash-lite`. When nothing has quota left, it falls back to recorded answers and the chip says so. |
+| Create a Payouts batch, poll it, update the bars | ✅ | ✅ Real batches created and settled (e.g. `ADNYV94GX85FA`, `7PPYELRHTJUFJ`). |
+| Payouts end as **SUCCESS** (bars turn green, "Nothing owed") | ✅ | ⚠️ **Only if `PAYPAL_SANDBOX_RECEIVER_EMAIL` is a sandbox personal account.** Without one, the seeded workers' fictional emails come back `UNCLAIMED`, and the provided business-account email failed with `SELF_PAY_NOT_ALLOWED`. I had no personal sandbox account, so **a live run reaching SUCCESS has not been verified.** |
+| Unclaimed payout: cancel, then re-send | ✅ | ❌ The sandbox's cancel endpoint returned `INTERNAL_SERVICE_ERROR` every time. Clockout then refuses to re-send, because re-sending before the cancel succeeds could pay twice, and shows why. A `FAILED` item (nothing to cancel) re-sends normally. |
+
+**What's simulated, in both modes:**
+- **The demo clock.** Time moves by button, not by the real clock.
+- **The Mon–Thu fast-forward** auto-approves those hours. In real use the owner approves each shift.
+- **Crew messages are seeded or typed into the composer.** No real SMS or WhatsApp is connected.
+- **The crew and businesses** are fictional.
 
 ---
 
@@ -44,7 +61,7 @@ All PayPal calls are server-side, in [`src/lib/paypal`](src/lib/paypal), behind 
 | Get an access token | OAuth2 client credentials via the official **`@paypal/paypal-server-sdk`** (`Client`, `clientCredentialsAuthManager.fetchToken()`) | `paypal/live.ts` |
 | Owner clicks **Approve & pay** | `POST /v1/payments/payouts`: one batch, one item per shift, amounts from integer minor units. `sender_batch_id` is unique per send, so a double-click can't pay twice. | `payouts.ts → sendBatch` |
 | Bars go *paying → paid* | `GET /v1/payments/payouts/{payout_batch_id}`, polled every 1.5s while items are `PENDING`. Each item's `transaction_status` drives the shift's state machine. | `payouts.ts → refreshPayouts` |
-| A payout fails or goes unclaimed | Shown with PayPal's error (`RECEIVER_UNREGISTERED`, `SELF_PAY_NOT_ALLOWED`, …) in plain English. **Retry**: `POST /v1/payments/payouts-item/{id}/cancel` for `UNCLAIMED` items first (so money can't go out twice), then a new batch. | `payouts.ts → retryPayout` |
+| A payout fails or goes unclaimed | Shown with PayPal's error (`RECEIVER_UNREGISTERED`, `SELF_PAY_NOT_ALLOWED`, …) in plain English. **Retry**: `POST /v1/payments/payouts-item/{id}/cancel` for `UNCLAIMED` items first (so money can't go out twice), then a new batch. The sandbox's cancel endpoint failed in testing (see the status table above). | `payouts.ts → retryPayout` |
 | Payouts panel history | Every batch and item with PayPal's batch id, transaction id and status, reconciled against the weekly budget: paid, in flight, owed now, headroom. | `components/PayoutsPanel.tsx` |
 
 The server SDK has no Payouts controller yet, so Payouts v1 is called over REST with the SDK-issued token. The mock ([`paypal/mock.ts`](src/lib/paypal/mock.ts)) keeps its state in SQLite and returns the documented response shapes: batches start `PENDING`, settle about 2 seconds later, and an address with no PayPal account comes back `UNCLAIMED` with `RECEIVER_UNREGISTERED`, just as the real sandbox does.
@@ -58,11 +75,13 @@ Two Gemini tool calls (Vercel AI SDK + `@ai-sdk/google`), each forced with `tool
 1. **`record_constraints`** turns every unread message into hard and soft rules: `unavailable` windows, `preferred` windows, preferred roles, an hour cap, and `dropShiftIds` (shifts the sender can no longer do, e.g. a sick call or a swap away). Times are resolved against the real week ("sat", "tues eve", "tonight").
 2. **`assign_shifts`** gets each open shift's eligible candidates (cost, hours so far, what they asked for) plus the budget and a deterministic baseline. It returns one assignment per shift, each with a one-sentence reason for the owner.
 
-**The model proposes; the code decides.** Every assignment is re-checked against the same hard rules as a drag and drop: role, unavailability, clashes, hour caps and budget ([`scheduling.ts`](src/lib/scheduling.ts)). A rejected pick is logged as *Guardrail*, and the slot is filled legally by the deterministic planner. Swaps work the same way: "can't do Thu, I'll take a Sat bar shift" drops one shift and adds a preference the refill honours.
+**The model proposes; the code decides.** Every assignment is re-checked against the same hard rules as a drag and drop: role, unavailability, clashes, hour caps and budget ([`scheduling.ts`](src/lib/scheduling.ts)). A rejected pick is logged as *Guardrail*, and the slot is filled legally by the deterministic planner.
+
+Swap requests are handled as **drop + refill**. "Can't do Thu, I'll take a Sat bar shift" drops the Thursday shift, refills it, and records the Saturday preference, which counts the next time open shifts are filled. There is no two-person trade, and Clockout won't move someone who is already booked to make room.
 
 **Free-tier engineering** ([`src/lib/ai/index.ts`](src/lib/ai/index.ts)):
 
-- **Model:** `AI_MODEL` if set. Otherwise Clockout lists models from the Gemini API and tries the newest stable Flash first. If that model's free quota is spent, it cascades down the Flash line.
+- **Model:** `AI_MODEL` if set. Otherwise Clockout lists models from the Gemini API and tries the newest stable Flash first. If that model's free quota is spent (429), or Google reports it's overloaded (503), Clockout tries the next model down the Flash line, then the Flash-Lite line.
 - **Cache:** responses are cached in SQLite by request hash, and the cache survives **Reset**, so re-running the demo costs no quota.
 - **Rate limit:** calls are capped locally per minute.
 - **Fallback:** on a 429 or quota error, a timeout, or no key, Clockout replays recorded responses and the **AI chip says so** (*AI · recorded*, with the reason on hover). The agent log tags every action *Gemini*, *Recorded AI*, *Guardrail* or *You*.
@@ -72,15 +91,16 @@ Two Gemini tool calls (Vercel AI SDK + `@ai-sdk/google`), each forced with `tool
 Clockout uses the **thin** trial packages, so **Scheduler Pro and Calendar run on the same page** with one shared core:
 
 - **Scheduler Pro** rota, one row per worker plus an *Open shifts* row.
-  - Drag, drop and resize, with a `validatorFn` that runs the same hard rules as the server and explains a refusal while you drag ("Maya is unavailable Sat (sister's wedding)").
+  - Drag, drop and resize, with a `validatorFn` that runs the same hard rules as the server and explains a refusal while you drag ("Maya is unavailable all day Sat (sister's wedding)").
   - A resize re-prices the shift at the agreed night and weekend rates.
+  - A shift can't be stretched past 14 hours. This also stops a resize from running across the folded-out night hours.
 - **Custom event renderer:** the bar's colour is its pay status (*open → booked → hours to approve → paying (animated stripes) → paid → needs attention*). Each bar shows role, time and pay. At week zoom it collapses to the worker's avatar and a status icon.
 - **Rich tooltip:** the base, night and weekend split, plus the PayPal batch and transaction ids.
 - **Resource time ranges** draw each worker's unavailability (hatched) and requested windows (green), straight from their texts.
 - **Time ranges** show the demo clock's *Now* line, and the view follows it.
 - **Non-continuous time axis** (`timeAxis.include` 06:00–24:00) folds out the night hours no one works.
-- **Partnered Resource Histogram** under the Scheduler, sharing its project and time axis. It shows each worker's load live as shifts move, with over-allocation in red. The resource column carries an hours-vs-cap bar.
-- **Event menu:** right-click a booked shift and choose **Drop & let the agent find cover**.
+- **Partnered Resource Histogram** under the Scheduler, sharing its project and time axis. It shows each worker's load live as shifts move. The resource column carries an hours-vs-cap bar. Honestly, this view adds less than the rest: the hard rules already block double-booking, so the histogram mostly confirms the rota is even.
+- **Event menu:** right-click a booked shift and choose **Drop & let the agent find cover**. The dropped worker is recorded as unavailable for that slot, so the agent can't book them straight back in. If no one else qualifies, the shift is left open and the log says so.
 - **Bryntum Calendar** (*Worker's week* tab): each worker's own week as they'd see it, with their shifts, pay status and blocked-out times, next to their agreed rates and what they've been paid so far.
 
 ## Live sandbox keys
@@ -136,7 +156,7 @@ src/
 tests/              Vitest
 ```
 
-See [DECISIONS.md](DECISIONS.md) for the trade-offs, [DEMO.md](DEMO.md) for the video script and [SUBMISSION.md](SUBMISSION.md) for the Devpost write-up.
+See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the five files that matter most, [DECISIONS.md](DECISIONS.md) for the trade-offs, [DEMO.md](DEMO.md) for the video script and [SUBMISSION.md](SUBMISSION.md) for the Devpost write-up.
 
 ## License
 
