@@ -31,8 +31,20 @@ export function maxHoursFor(worker: Worker, constraints: Constraint[]): number {
 }
 
 /** Can `worker` take `shift` at `shift.start`–`shift.end`, given everything else in the rota? */
+/** Longest single shift anyone can be booked for. Also stops a resize running across the folded-out night. */
+export const MAX_SHIFT_HOURS = 14;
+
+export function checkShiftLength(start: string, end: string): string | null {
+  const mins = durationMinutes(start, end);
+  if (mins <= 0) return "a shift must end after it starts";
+  if (mins > MAX_SHIFT_HOURS * 60) return `a shift can't be longer than ${MAX_SHIFT_HOURS}h`;
+  return null;
+}
+
 export function checkAssignment(shift: Pick<Shift, "id" | "role" | "start" | "end">, worker: Worker, ctx: RotaContext): Check {
   const reasons: string[] = [];
+  const length = checkShiftLength(shift.start, shift.end);
+  if (length) reasons.push(length);
   if (!worker.roles.includes(shift.role)) {
     reasons.push(`${worker.name.split(" ")[0]} isn't on the books as ${shift.role}`);
   }

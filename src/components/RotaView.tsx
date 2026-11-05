@@ -20,6 +20,9 @@ import { Icon } from "./ui";
 
 type Zoom = "detail" | "week";
 
+// Narrower crew column on phones so the timeline keeps most of the screen.
+const CREW_COL = typeof window !== "undefined" && window.innerWidth < 600 ? 128 : 196;
+
 const PRESETS = {
   detail: {
     base: "hourAndDay",
@@ -97,7 +100,7 @@ export function RotaView({
         {
           text: "Crew",
           field: "name",
-          width: 196,
+          width: CREW_COL,
           htmlEncode: false,
           renderer: ({ record }: { record: { get: (f: string) => unknown; name: string } }) => resourceCellHtml(record),
         },
@@ -135,24 +138,31 @@ export function RotaView({
           startDate,
           endDate,
         }: {
-          eventRecords: { id: unknown }[];
-          newResource: { id: unknown };
+          eventRecords?: { id: unknown }[];
+          newResource?: { id: unknown };
           startDate: Date;
           endDate: Date;
-        }) => validateMove(stateRef.current, String(eventRecords[0].id), String(newResource.id), startDate, endDate),
+        }) =>
+          // Bryntum calls this while the pointer is outside any row too; there is nothing to validate then.
+          eventRecords?.[0] && newResource
+            ? validateMove(stateRef.current, String(eventRecords[0].id), String(newResource.id), startDate, endDate)
+            : false,
       },
       eventResizeFeature: {
-        validatorFn: ({
-          record,
-          startDate,
-          endDate,
-        }: {
-          record: { id: unknown; resourceId?: unknown; get: (f: string) => unknown };
-          startDate: Date;
-          endDate: Date;
+        // At runtime (7.3.8) the context carries `eventRecord`, not the `record` the .d.ts names,
+        // and `endDate` can be missing while only the start edge moves. Accept both.
+        validatorFn: (ctx: {
+          eventRecord?: { id: unknown; startDate: Date | string; endDate: Date | string };
+          record?: { id: unknown; startDate: Date | string; endDate: Date | string };
+          startDate?: Date;
+          endDate?: Date;
         }) => {
-          const shift = stateRef.current.shifts.find((s) => s.id === record.id);
-          return validateMove(stateRef.current, String(record.id), shift?.workerId ?? OPEN_ROW, startDate, endDate).valid;
+          const rec = ctx.eventRecord ?? ctx.record;
+          if (!rec) return false;
+          const shift = stateRef.current.shifts.find((s) => s.id === rec.id);
+          const start = ctx.startDate ?? new Date(rec.startDate);
+          const end = ctx.endDate ?? new Date(rec.endDate);
+          return validateMove(stateRef.current, String(rec.id), shift?.workerId ?? OPEN_ROW, start, end).valid;
         },
       },
       eventMenuFeature: {
@@ -249,7 +259,7 @@ export function RotaView({
               {
                 text: "Load",
                 field: "name",
-                width: 196,
+                width: CREW_COL,
                 htmlEncode: false,
                 renderer: ({ record }: { record: { name: string; get: (f: string) => unknown } }) =>
                   `<span class="co-hist-name"><i style="background:${record.get("color")}"></i>${record.name}</span>`,

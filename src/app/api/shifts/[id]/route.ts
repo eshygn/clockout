@@ -2,9 +2,9 @@ import { z } from "zod";
 import { handle } from "@/lib/http";
 import { formatMoney } from "@/lib/money";
 import { applyTransition, getBusiness, getConstraints, getShift, getShifts, getWorker, getWorkers, logAction, saveShift } from "@/lib/repo";
-import { checkAssignment } from "@/lib/scheduling";
+import { checkAssignment, checkShiftLength } from "@/lib/scheduling";
 import { isEditable } from "@/lib/shiftState";
-import { formatRange, isWall, toMin } from "@/lib/time";
+import { formatRange, isWall } from "@/lib/time";
 
 const body = z.object({
   workerId: z.string().nullable().optional(),
@@ -21,7 +21,8 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     if (!shift) throw new Error("No such shift");
     if (!isEditable(shift.status)) throw new Error(`This shift is ${shift.status} and can no longer be changed.`);
     const next = { ...shift, ...patch, workerId: patch.workerId === undefined ? shift.workerId : patch.workerId };
-    if (toMin(next.end) <= toMin(next.start)) throw new Error("A shift must end after it starts.");
+    const length = checkShiftLength(next.start, next.end);
+    if (length) throw new Error(`Can't save: ${length}.`);
     if (next.workerId) {
       const worker = getWorker(next.workerId);
       if (!worker) throw new Error("Unknown worker");

@@ -82,6 +82,13 @@ describe("recorded fallback reader", () => {
 });
 
 describe("model selection", () => {
+  it("tells quota errors from overload errors", async () => {
+    const { isOverloaded, isRateLimit } = await import("@/lib/ai");
+    expect(isRateLimit({ statusCode: 429, message: "quota" })).toBe(true);
+    expect(isOverloaded({ statusCode: 503, message: "This model is currently experiencing high demand." })).toBe(true);
+    expect(isOverloaded({ statusCode: 400, message: "bad request" })).toBe(false);
+  });
+
   it("picks the newest stable Flash model", () => {
     expect(
       pickNewestFlash([
