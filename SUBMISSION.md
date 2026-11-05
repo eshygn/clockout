@@ -17,8 +17,9 @@ Both problems sit between a message and a payment. AI is now good at the message
 - **Workers text in plain English.** An AI agent (Gemini, through the Vercel AI SDK) reads the texts into structured rules: who can't work when, who asked for what, hour caps and dropped shifts.
 - **The agent runs the rota.** It staffs the whole week within the budget and explains every pick in a sentence. When someone calls in sick, it takes them off and books the best free, qualified, under-cap person in seconds.
 - **Guardrails decide what lands.** Every AI change is re-checked against hard rules before it's applied, and so is every drag, drop and resize the owner makes.
+- **The demo clock** jumps through the week in three steps. Moving to Friday fast-forwards Monday to Thursday, approving and paying those shifts in one batch, so the story fits in three minutes.
 - **Approving hours pays the worker immediately** with **PayPal Payouts**, at their agreed rate, including night and weekend rates. The shift's bar on the schedule goes from *booked* to *paying* to **paid**.
-- **Failures are visible and retryable.** An unclaimed payout (a typo'd email) is cancelled first, then re-sent to the corrected address.
+- **Failures are visible and retryable.** An unclaimed payout (a typo'd email) is cancelled first, then re-sent to the corrected address. Clockout never re-sends until PayPal confirms the cancel. In our sandbox tests the cancel endpoint itself kept erroring, so this path is shown in mock mode.
 - **The books reconcile themselves.** A weekly payouts panel reconciles everything against the budget, down to *Nothing owed*.
 - **Each worker has their own week** on a **Bryntum Calendar**: shifts, blocked-out times, rates and what's been paid.
 
@@ -46,13 +47,14 @@ Both problems sit between a message and a payment. AI is now good at the message
 
 - **Free-tier quotas.** Gemini's free tier differs per model and per day. Instead of hard-coding a model, Clockout lists the available Flash models and cascades through them on quota errors. It caches every answer so a re-run costs nothing, and falls back gracefully when the quota is gone.
 - **Two Bryntum products on one page.** The regular bundles refuse to load twice. Switching to the thin packages fixed that. Then the bundler tree-shook features we only named in config, and importing them explicitly fixed that too.
-- **Sandbox realism.** In live testing, payouts to our own business account failed with `SELF_PAY_NOT_ALLOWED`, and unknown addresses came back `UNCLAIMED`. We turned both into first-class, plain-English states with a retry. We also refused to re-send an unclaimed payout until PayPal confirms the cancel, so nobody gets paid twice.
+- **Sandbox realism.** In live testing, payouts to our own business account failed with `SELF_PAY_NOT_ALLOWED`, and unknown addresses came back `UNCLAIMED`. We turned both into first-class, plain-English states with a retry. We also refused to re-send an unclaimed payout until PayPal confirms the cancel, so nobody gets paid twice. The sandbox's cancel endpoint returned `INTERNAL_SERVICE_ERROR` every time we tried, so in the sandbox that retry stays blocked, with an explanation on screen.
+- **Bryntum types versus runtime.** The resize validator receives `eventRecord` at runtime, while the type definitions say `record`. Following the types silently refused every resize until an end-to-end browser test caught it.
 - **Trusting an AI with a schedule.** The answer was letting the model decide and explain, while deterministic code verifies every change, the same way it verifies the owner's own drag and drop.
 
 ## Accomplishments that we're proud of
 
 - A sick call goes from text to covered shift in seconds, with a human-readable reason.
-- Clicking "approve" puts money with three freelancers on a Friday night, and the schedule shows it.
+- One "approve" click sends a PayPal Payouts batch to three freelancers on a Friday night, and the schedule shows each payment land.
 - The whole story runs with zero API keys, and every chip tells the truth about what's live and what's recorded.
 - Money is never a float, anywhere.
 
