@@ -159,7 +159,7 @@ src/
 tests/              Vitest
 ```
 
-See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the five files that matter most, [DECISIONS.md](DECISIONS.md) for the trade-offs, [DEMO.md](DEMO.md) for the video script and [SUBMISSION.md](SUBMISSION.md) for the Devpost write-up.
+See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the five files that matter most, [DECISIONS.md](DECISIONS.md) for the trade-offs and [SUBMISSION.md](SUBMISSION.md) for the Devpost write-up.
 
 ## License
 
