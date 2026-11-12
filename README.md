@@ -82,7 +82,7 @@ Swap requests are handled as **drop + refill**. "Can't do Thu, I'll take a Sat b
 
 **Free-tier engineering** ([`src/lib/ai/index.ts`](src/lib/ai/index.ts)):
 
-- **Model:** the newest stable Gemini Flash the API lists (or `AI_MODEL` if set), then `gemini-2.5-flash`, then recorded responses. Clockout moves down that chain when a model is rate-limited (429), overloaded (503) or times out.
+- **Model:** the newest stable Gemini Flash the API lists (or `AI_MODEL` if set), then the next two Flash models the API lists, then recorded responses. Clockout moves down that chain when a model is rate-limited (429), overloaded (503) or times out.
 - **Cache:** responses are cached in SQLite by request hash, and the cache survives **Reset**, so re-running the demo costs no quota.
 - **Rate limit:** calls are capped locally per minute.
 - **Shown on screen:** the AI chip names what answered the last call: the model id (for example *AI · gemini-2.5-flash*), *Gemini (cached answer)*, or *recorded*, with the reason on hover. The agent log tags every action *Gemini*, *Recorded AI*, *Guardrail* or *You*.
