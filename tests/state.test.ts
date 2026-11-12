@@ -96,8 +96,10 @@ describe("sandbox receivers and AI fallback chain", async () => {
     expect(receiverFor({ name: "Maya Chen", paypalEmail: "x@crew.example" }, 0, "live", false, only)).toBe("other@personal.example.com");
   });
 
-  it("keeps the typo'd address and never redirects in mock mode", () => {
-    expect(receiverFor({ name: "Jonah Brooks", paypalEmail: "j@gmial.com" }, 4, "live", true, env)).toBe("j@gmial.com");
+  it("redirects the typo'd address live when receivers exist, keeps it otherwise", () => {
+    expect(receiverFor({ name: "Jonah Brooks", paypalEmail: "j@gmial.com" }, 4, "live", true, env)).toBe("ava@personal.example.com");
+    expect(receiverFor({ name: "Jonah Brooks", paypalEmail: "j@gmial.com" }, 4, "live", true, {})).toBe("j@gmial.com");
+    expect(receiverFor({ name: "Jonah Brooks", paypalEmail: "j@gmial.com" }, 4, "mock", true, env)).toBe("j@gmial.com");
     expect(receiverFor({ name: "Maya Chen", paypalEmail: "x@crew.example" }, 0, "mock", false, env)).toBe("x@crew.example");
   });
   it("tries the newest Flash, then gemini-2.5-flash", () => {

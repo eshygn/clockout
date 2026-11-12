@@ -19,7 +19,7 @@ Both problems sit between a message and a payment. AI is now good at the message
 - **Guardrails decide what lands.** Every AI change is re-checked against hard rules before it's applied, and so is every drag, drop and resize the owner makes.
 - **The demo clock** jumps through the week in three steps. Moving to Friday fast-forwards Monday to Thursday, approving and paying those shifts in one batch, so the story fits in three minutes.
 - **Approving hours pays the worker immediately** with **PayPal Payouts**, at their agreed rate, including night and weekend rates. The shift's bar on the schedule goes from *booked* to *paying* to **paid**.
-- **Failures are visible and retryable.** An unclaimed payout (a typo'd email) is cancelled first, then re-sent to the corrected address. Clockout never re-sends until PayPal confirms the cancel. In our sandbox tests the cancel endpoint itself kept erroring, so this path is shown in mock mode.
+- **Failures are visible and retryable** (demonstrated in mock mode). An unclaimed payout (a typo'd email) is cancelled first, then re-sent to the corrected address. Clockout never re-sends until PayPal confirms the cancel. In our sandbox tests the cancel endpoint itself kept erroring, so this path is shown in mock mode.
 - **The books reconcile themselves.** A weekly payouts panel reconciles everything against the budget, down to *Nothing owed*.
 - **Each worker has their own week** on a **Bryntum Calendar**: shifts, blocked-out times, rates and what's been paid.
 

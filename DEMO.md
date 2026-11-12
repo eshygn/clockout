@@ -6,7 +6,7 @@
 **Which mode to record in.** This script matches mock mode exactly. Live mode differs in three places (see the README status table):
 - **Gemini** may staff the week differently, so the drag in Shot 4 may need a different shift or worker.
 - **Payouts only reach Paid** if `SANDBOX_RECEIVER_*` points at sandbox personal accounts.
-- **Jonah's Retry fails** in the sandbox, because its cancel endpoint errors.
+- **Shots 6–7 (Jonah's unclaimed payout and Retry) only happen in mock mode.** Live, Jonah is paid like everyone else, because the sandbox can't cancel an unclaimed payout. Record those two shots in mock mode, or cut them.
 
 Recommended:
 1. Set a personal sandbox receiver and record live, so the chip reads *PayPal · sandbox*.

@@ -60,7 +60,8 @@ export function paypalStatus(): { mode: "live" | "mock"; detail: string } {
  *   - SANDBOX_RECEIVER_<FIRSTNAME> pays that worker (SANDBOX_RECEIVER_SAM pays Sam);
  *   - everyone else is spread across the SANDBOX_RECEIVER_* accounts, in crew order;
  *   - PAYPAL_SANDBOX_RECEIVER_EMAIL is used only when no SANDBOX_RECEIVER_* is set.
- * A deliberately typo'd address is always kept as-is, so the unclaimed flow is real too.
+ * With receivers set, Jonah's typo'd address is redirected too, so a live run ends fully paid.
+ * The unclaimed-and-retry beat then appears in mock mode only (the sandbox's cancel endpoint errors).
  */
 export function sandboxReceivers(env: Record<string, string | undefined> = process.env): {
   byName: Record<string, string>;
@@ -91,7 +92,10 @@ export function receiverFor(
   looksBad: boolean,
   env: Record<string, string | undefined> = process.env,
 ): string {
-  if (mode !== "live" || looksBad) return worker.paypalEmail;
+  if (mode !== "live") return worker.paypalEmail;
+  // With sandbox receivers set, a typo'd address is redirected too: the sandbox cannot cancel an
+  // unclaimed payout, so the unclaimed-and-retry beat is shown in mock mode only.
+  if (looksBad && !sandboxReceivers(env).pool.length) return worker.paypalEmail;
   const { byName, pool } = sandboxReceivers(env);
   const first = worker.name.split(" ")[0].toUpperCase();
   if (byName[first]) return byName[first];
