@@ -85,6 +85,17 @@ describe("sandbox receivers and AI fallback chain", async () => {
     expect(receiverFor({ name: "Maya Chen", paypalEmail: "x@crew.example" }, 0, "live", false, env)).toBe("ava@personal.example.com");
     expect(receiverFor({ name: "Diego Ramírez", paypalEmail: "x@crew.example" }, 1, "live", false, env)).toBe("sam@personal.example.com");
   });
+  it("ignores the fallback receiver once named receivers exist", () => {
+    const withExtra = { ...env, PAYPAL_SANDBOX_RECEIVER_EMAIL: "other@personal.example.com" };
+    for (let i = 0; i < 6; i++) {
+      expect(receiverFor({ name: "Maya Chen", paypalEmail: "x@crew.example" }, i, "live", false, withExtra)).not.toBe(
+        "other@personal.example.com",
+      );
+    }
+    const only = { PAYPAL_SANDBOX_RECEIVER_EMAIL: "other@personal.example.com" };
+    expect(receiverFor({ name: "Maya Chen", paypalEmail: "x@crew.example" }, 0, "live", false, only)).toBe("other@personal.example.com");
+  });
+
   it("keeps the typo'd address and never redirects in mock mode", () => {
     expect(receiverFor({ name: "Jonah Brooks", paypalEmail: "j@gmial.com" }, 4, "live", true, env)).toBe("j@gmial.com");
     expect(receiverFor({ name: "Maya Chen", paypalEmail: "x@crew.example" }, 0, "mock", false, env)).toBe("x@crew.example");

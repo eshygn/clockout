@@ -115,7 +115,7 @@ cp .env.example .env.local
 - **PayPal**
   1. In the [developer dashboard](https://developer.paypal.com/dashboard/applications/sandbox), create a sandbox REST app with **Payouts** enabled.
   2. Set `PAYPAL_CLIENT_ID` and `PAYPAL_CLIENT_SECRET`.
-  3. Set receivers to sandbox **personal** accounts (*Testing Tools → Sandbox Accounts*). `SANDBOX_RECEIVER_<FIRSTNAME>` pays that worker, so `SANDBOX_RECEIVER_SAM` pays Sam. Every other worker is spread across all the receivers you set (any `SANDBOX_RECEIVER_*`, plus the optional `PAYPAL_SANDBOX_RECEIVER_EMAIL`). With none set, payouts go to the seeded workers' fictional emails, and PayPal holds them as `UNCLAIMED`.
+  3. Set receivers to sandbox **personal** accounts (*Testing Tools → Sandbox Accounts*). `SANDBOX_RECEIVER_<FIRSTNAME>` pays that worker, so `SANDBOX_RECEIVER_SAM` pays Sam. Every other worker is spread across the `SANDBOX_RECEIVER_*` accounts you set. `PAYPAL_SANDBOX_RECEIVER_EMAIL` is used only when no `SANDBOX_RECEIVER_*` is set. With none set, payouts go to the seeded workers' fictional emails, and PayPal holds them as `UNCLAIMED`.
   4. Don't use your business account as the receiver: PayPal rejects paying yourself (`SELF_PAY_NOT_ALLOWED`).
 - **Gemini:** set `GOOGLE_GENERATIVE_AI_API_KEY` from [Google AI Studio](https://aistudio.google.com/apikey). Leave `AI_MODEL` empty to auto-pick.
 - **Bryntum:** `BRYNTUM_EMAIL` is only needed to install packages, not at runtime.

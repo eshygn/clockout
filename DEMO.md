@@ -5,7 +5,7 @@
 
 **Which mode to record in.** This script matches mock mode exactly. Live mode differs in three places (see the README status table):
 - **Gemini** may staff the week differently, so the drag in Shot 4 may need a different shift or worker.
-- **Payouts only reach Paid** if `SANDBOX_RECEIVER_*` (or `PAYPAL_SANDBOX_RECEIVER_EMAIL`) points at sandbox personal accounts.
+- **Payouts only reach Paid** if `SANDBOX_RECEIVER_*` points at sandbox personal accounts.
 - **Jonah's Retry fails** in the sandbox, because its cancel endpoint errors.
 
 Recommended:

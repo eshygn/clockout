@@ -58,8 +58,8 @@ export function paypalStatus(): { mode: "live" | "mock"; detail: string } {
  * fictional, and PayPal holds money sent to an address with no account as UNCLAIMED.
  * So live payouts go to real sandbox *personal* accounts taken from the environment:
  *   - SANDBOX_RECEIVER_<FIRSTNAME> pays that worker (SANDBOX_RECEIVER_SAM pays Sam);
- *   - everyone else is spread across all configured receivers, in crew order
- *     (any SANDBOX_RECEIVER_* plus the optional PAYPAL_SANDBOX_RECEIVER_EMAIL).
+ *   - everyone else is spread across the SANDBOX_RECEIVER_* accounts, in crew order;
+ *   - PAYPAL_SANDBOX_RECEIVER_EMAIL is used only when no SANDBOX_RECEIVER_* is set.
  * A deliberately typo'd address is always kept as-is, so the unclaimed flow is real too.
  */
 export function sandboxReceivers(env: Record<string, string | undefined> = process.env): {
@@ -71,15 +71,16 @@ export function sandboxReceivers(env: Record<string, string | undefined> = proce
     const m = /^SANDBOX_RECEIVER_([A-Z]+)$/.exec(k);
     if (m && v?.trim()) byName[m[1]] = v.trim();
   }
-  const extra = env.PAYPAL_SANDBOX_RECEIVER_EMAIL?.trim();
-  const pool = [
-    ...new Set([
-      ...Object.keys(byName)
+  // PAYPAL_SANDBOX_RECEIVER_EMAIL is only a fallback: it is ignored as soon as any SANDBOX_RECEIVER_* is set.
+  const named = [
+    ...new Set(
+      Object.keys(byName)
         .sort()
         .map((k) => byName[k]),
-      ...(extra ? [extra] : []),
-    ]),
+    ),
   ];
+  const extra = env.PAYPAL_SANDBOX_RECEIVER_EMAIL?.trim();
+  const pool = named.length ? named : extra ? [extra] : [];
   return { byName, pool };
 }
 
