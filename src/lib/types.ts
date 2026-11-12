@@ -106,7 +106,8 @@ export interface PayoutItem {
 }
 
 export interface ServiceStatus {
-  ai: { mode: "live" | "recorded"; model: string | null; detail: string };
+  /** `using` is what answered the most recent AI call: a model id, a cached answer, or "recorded". */
+  ai: { mode: "live" | "recorded"; model: string | null; detail: string; using: string | null };
   paypal: { mode: "live" | "mock"; detail: string };
   bryntum: { mode: "trial"; detail: string };
 }

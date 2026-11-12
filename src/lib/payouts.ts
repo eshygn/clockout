@@ -12,6 +12,7 @@ import {
   getItems,
   getShift,
   getWorker,
+  getWorkers,
   inTransaction,
   insertBatch,
   insertItem,
@@ -38,6 +39,7 @@ async function sendBatch(lines: Line[], label: string) {
   const batchId = `pb_${shortId()}`;
   // sender_batch_id is unique per send; PayPal rejects a duplicate, so a double-click can never pay twice.
   const senderBatchId = `clockout-${now().slice(0, 10)}-${shortId()}`;
+  const crew = getWorkers();
   const items: PayoutItem[] = lines.map(({ shift, attempt }) => {
     const worker = getWorker(shift.workerId!)!;
     return {
@@ -48,7 +50,15 @@ async function sendBatch(lines: Line[], label: string) {
       senderItemId: `${shift.id}-a${attempt}`,
       paypalItemId: null,
       transactionId: null,
-      receiver: receiverFor(worker.paypalEmail, adapter.mode, looksUnregistered(worker.paypalEmail)),
+      receiver: receiverFor(
+        worker,
+        Math.max(
+          0,
+          crew.findIndex((w) => w.id === worker.id),
+        ),
+        adapter.mode,
+        looksUnregistered(worker.paypalEmail),
+      ),
       amountMinor: shift.payMinor,
       currency: biz.currency,
       status: "PENDING",

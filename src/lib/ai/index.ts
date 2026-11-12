@@ -23,6 +23,8 @@ interface AiState {
   mode: "live" | "recorded";
   detail: string;
   calls: number[];
+  /** What answered the most recent call: a model id, "Gemini (cached answer)" or "recorded". */
+  using?: string | null;
   /** Models that rejected thinkingLevel "minimal". */
   noMinimalThinking?: string[];
 }
@@ -51,7 +53,7 @@ function state(): AiState {
 
 export function aiStatus() {
   const s = state();
-  return { mode: s.mode, model: s.model, detail: s.detail };
+  return { mode: s.mode, model: s.model, detail: s.detail, using: s.using ?? null };
 }
 
 /**
@@ -75,26 +77,35 @@ export function pickNewestFlash(names: string[]): string | null {
   return rankFlashModels(names)[0] ?? null;
 }
 
+/**
+ * The order Clockout tries: the newest stable Gemini Flash (or AI_MODEL if set), then
+ * gemini-2.5-flash, then recorded responses. A model that is rate-limited or overloaded
+ * is parked briefly and skipped.
+ */
+export function fallbackChain(primary: string | null): string[] {
+  return [...new Set([primary ?? FALLBACK_MODEL, FALLBACK_MODEL])];
+}
+
 async function candidateModels(): Promise<string[]> {
   const s = state();
-  if (process.env.AI_MODEL) return [process.env.AI_MODEL];
   if (!s.candidates) {
-    try {
-      const res = await fetch("https://generativelanguage.googleapis.com/v1beta/models?pageSize=1000", {
-        headers: { "x-goog-api-key": process.env.GOOGLE_GENERATIVE_AI_API_KEY! },
-        signal: AbortSignal.timeout(8000),
-      });
-      const json = (await res.json()) as { models?: { name: string; supportedGenerationMethods?: string[] }[] };
-      const names = (json.models ?? []).filter((m) => m.supportedGenerationMethods?.includes("generateContent")).map((m) => m.name);
-      s.candidates = rankFlashModels(names).slice(0, 8);
-    } catch {
-      s.candidates = [];
+    let primary: string | null = process.env.AI_MODEL || null;
+    if (!primary) {
+      try {
+        const res = await fetch("https://generativelanguage.googleapis.com/v1beta/models?pageSize=1000", {
+          headers: { "x-goog-api-key": process.env.GOOGLE_GENERATIVE_AI_API_KEY! },
+          signal: AbortSignal.timeout(8000),
+        });
+        const json = (await res.json()) as { models?: { name: string; supportedGenerationMethods?: string[] }[] };
+        const names = (json.models ?? []).filter((m) => m.supportedGenerationMethods?.includes("generateContent")).map((m) => m.name);
+        primary = pickNewestFlash(names);
+      } catch {
+        primary = null;
+      }
     }
-    if (!s.candidates.length) s.candidates = [FALLBACK_MODEL];
+    s.candidates = fallbackChain(primary);
   }
-  // Prefer the model that last worked, then newest first, skipping ones out of quota.
-  const ordered = s.model ? [s.model, ...s.candidates.filter((m) => m !== s.model)] : s.candidates;
-  return ordered.filter((m) => (s.exhausted[m] ?? 0) < Date.now());
+  return s.candidates.filter((m) => (s.exhausted[m] ?? 0) < Date.now());
 }
 
 function cacheKey(parts: unknown): string {
@@ -145,14 +156,33 @@ export interface AiResult<T> {
  * Forces one tool call with a zod-validated input and returns that input.
  * `fallback` produces the recorded answer when the live path is unavailable.
  */
-async function callTool<S extends z.ZodType, T = z.infer<S>>(opts: {
+type ToolOpts<S extends z.ZodType, T> = {
   name: string;
   description: string;
   schema: S;
   instructions: string;
   prompt: string;
   fallback: () => T;
-}): Promise<AiResult<T>> {
+};
+
+/**
+ * Keep thinking as low as each model allows: this is structured extraction, and speed matters in a demo.
+ * Gemini 2.5 takes a zero thinking budget. Gemini 3.x takes thinkingLevel "minimal", or "low" where it rejects that.
+ */
+export function thinkingFor(model: string, rejectedMinimal: boolean) {
+  if (/^gemini-2\./.test(model)) return { thinkingBudget: 0 };
+  return { thinkingLevel: rejectedMinimal ? ("low" as const) : ("minimal" as const) };
+}
+
+/** Runs the call and records what actually answered, so the status chip can show it. */
+async function callTool<S extends z.ZodType, T = z.infer<S>>(opts: ToolOpts<S, T>): Promise<AiResult<T>> {
+  const s = state();
+  const result = await callToolInner<S, T>(opts);
+  s.using = result.source === "recorded" ? "recorded" : result.cached ? "Gemini (cached answer)" : s.model;
+  return result;
+}
+
+async function callToolInner<S extends z.ZodType, T>(opts: ToolOpts<S, T>): Promise<AiResult<T>> {
   const s = state();
   if (s.mode !== "live") return { value: opts.fallback(), source: "recorded", cached: false };
 
@@ -161,9 +191,10 @@ async function callTool<S extends z.ZodType, T = z.infer<S>>(opts: {
   const hit = cacheGet<T>(key);
   if (hit) return { value: hit, source: "gemini", cached: true };
 
-  const models = (await candidateModels()).slice(0, 8);
+  const models = await candidateModels();
   if (!models.length) {
-    s.detail = "Recorded: Gemini free tier rate-limited";
+    // Every model in the chain was rate-limited, overloaded or timed out in the last few minutes.
+    s.detail = "Recorded: Gemini models busy or out of quota, retrying shortly";
     return { value: opts.fallback(), source: "recorded", cached: false };
   }
   const google = createGoogleGenerativeAI({ apiKey: process.env.GOOGLE_GENERATIVE_AI_API_KEY });
@@ -186,7 +217,7 @@ async function callTool<S extends z.ZodType, T = z.infer<S>>(opts: {
         providerOptions: {
           google: {
             // Gemini 3.x takes thinkingLevel; older models (2.5) reject it and take a zero thinking budget instead.
-            thinkingConfig: s.noMinimalThinking?.includes(model) ? { thinkingBudget: 0 } : { thinkingLevel: "minimal" as const },
+            thinkingConfig: thinkingFor(model, !!s.noMinimalThinking?.includes(model)),
           },
         },
       });
@@ -216,9 +247,10 @@ async function callTool<S extends z.ZodType, T = z.infer<S>>(opts: {
         continue;
       }
       if (isOverloaded(e) || /aborted due to timeout|timed? ?out/i.test(String((e as Error).message))) {
+        const timedOut = !isOverloaded(e);
         s.exhausted[model] = Date.now() + 60_000;
-        s.detail = "Recorded: Gemini overloaded";
-        console.warn(`[ai] ${model} is overloaded; trying the next model`);
+        s.detail = timedOut ? "Recorded: Gemini timed out" : "Recorded: Gemini overloaded";
+        console.warn(`[ai] ${model} ${timedOut ? `timed out after ${Date.now() - started}ms` : "is overloaded"}; trying the next model`);
         continue;
       }
       s.detail = `Recorded: Gemini error (${String((e as Error).message).slice(0, 60)})`;

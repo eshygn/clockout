@@ -33,19 +33,19 @@ Open http://localhost:3000. `npm run dev` also works with no keys at all: every 
 
 **Reset** in the top bar puts everything back to Monday morning.
 
-### What works where (honest status)
+### Real vs simulated
 
-Tested on 4–5 Nov 2026, against the real Gemini API and the real PayPal sandbox:
+Tested on 4–5 and 12 Nov 2026, against the real Gemini API and the real PayPal sandbox:
 
 | | Mock mode (no keys) | Live: Gemini + PayPal sandbox |
 | --- | --- | --- |
-| AI reads messages, builds the week, refills the sick call | ✅ Recorded tool-call answers plus a small rule-based reader | ✅ Ran end to end on Gemini Flash. On this key, the free daily quota ran out on the newer Flash models, so the cascade answered with `gemini-3.6/3.5-flash` and `gemini-3.5-flash-lite`. When nothing has quota left, it falls back to recorded answers and the chip says so. |
+| AI reads messages, builds the week, refills the sick call | ✅ Recorded tool-call answers plus a small rule-based reader | ✅ Ran end to end on Gemini. On 12 Nov 2026 the newest Flash (`gemini-3.8-flash`) was overloaded, so `gemini-2.5-flash` answered both calls, and the chip showed that model. When neither answers, Clockout uses recorded answers and the chip reads *AI · recorded*. |
 | Create a Payouts batch, poll it, update the bars | ✅ | ✅ Real batches created and settled (e.g. `ADNYV94GX85FA`, `7PPYELRHTJUFJ`). |
-| Payouts end as **SUCCESS** (bars turn green, "Nothing owed") | ✅ | ✅ **Verified on 5 Nov 2026** with a funded sandbox business app and `PAYPAL_SANDBOX_RECEIVER_EMAIL` set to a sandbox personal account. Mon–Thu batch `S3M64ZEMNW34C`: 9 items `SUCCESS` and Jonah's typo `UNCLAIMED`, as designed. Gala batch `Y6UEARDQGLTMU` also went out. Without a personal receiver, payouts come back `UNCLAIMED`; with the app's own account as receiver, they fail with `SELF_PAY_NOT_ALLOWED`. |
+| Payouts end as **SUCCESS** (bars turn green, "Nothing owed") | ✅ | ✅ **Verified on 5 Nov 2026** with a funded sandbox business app and a sandbox personal account as the receiver. Mon–Thu batch `S3M64ZEMNW34C`: 9 items `SUCCESS` and Jonah's typo `UNCLAIMED`, as designed. Gala batch `Y6UEARDQGLTMU` also went out. Without a personal receiver, payouts come back `UNCLAIMED`; with the app's own account as receiver, they fail with `SELF_PAY_NOT_ALLOWED`. |
 | PayPal refuses the whole batch (e.g. `INSUFFICIENT_FUNDS`) | ✅ (tested) | ✅ Seen live on 5 Nov 2026. Nothing is sent, the shifts return to "hours to approve", and the toast says to add sandbox funds and approve again. |
 | Unclaimed payout: cancel, then re-send | ✅ | ❌ The sandbox's cancel endpoint returned `INTERNAL_SERVICE_ERROR` every time. Clockout then refuses to re-send, because re-sending before the cancel succeeds could pay twice, and shows why. A `FAILED` item (nothing to cancel) re-sends normally. |
 
-**What's simulated, in both modes:**
+**Simulated in both modes:**
 - **The demo clock.** Time moves by button, not by the real clock.
 - **The Mon–Thu fast-forward** auto-approves those hours. In real use the owner approves each shift.
 - **Crew messages are seeded or typed into the composer.** No real SMS or WhatsApp is connected.
@@ -82,10 +82,10 @@ Swap requests are handled as **drop + refill**. "Can't do Thu, I'll take a Sat b
 
 **Free-tier engineering** ([`src/lib/ai/index.ts`](src/lib/ai/index.ts)):
 
-- **Model:** `AI_MODEL` if set. Otherwise Clockout lists models from the Gemini API and tries the newest stable Flash first. If that model's free quota is spent (429), or Google reports it's overloaded (503), Clockout tries the next model down the Flash line, then the Flash-Lite line.
+- **Model:** the newest stable Gemini Flash the API lists (or `AI_MODEL` if set), then `gemini-2.5-flash`, then recorded responses. Clockout moves down that chain when a model is rate-limited (429), overloaded (503) or times out.
 - **Cache:** responses are cached in SQLite by request hash, and the cache survives **Reset**, so re-running the demo costs no quota.
 - **Rate limit:** calls are capped locally per minute.
-- **Fallback:** on a 429 or quota error, a timeout, or no key, Clockout replays recorded responses and the **AI chip says so** (*AI · recorded*, with the reason on hover). The agent log tags every action *Gemini*, *Recorded AI*, *Guardrail* or *You*.
+- **Shown on screen:** the AI chip names what answered the last call: the model id (for example *AI · gemini-2.5-flash*), *Gemini (cached answer)*, or *recorded*, with the reason on hover. The agent log tags every action *Gemini*, *Recorded AI*, *Guardrail* or *You*.
 
 ## Bryntum depth
 
@@ -115,7 +115,7 @@ cp .env.example .env.local
 - **PayPal**
   1. In the [developer dashboard](https://developer.paypal.com/dashboard/applications/sandbox), create a sandbox REST app with **Payouts** enabled.
   2. Set `PAYPAL_CLIENT_ID` and `PAYPAL_CLIENT_SECRET`.
-  3. Set `PAYPAL_SANDBOX_RECEIVER_EMAIL` to a sandbox **personal** account (*Testing Tools → Sandbox Accounts*). In live mode every worker is paid there, so payouts settle as `SUCCESS`. Without it, payouts go to the seeded workers' fictional emails, and PayPal holds them as `UNCLAIMED`.
+  3. Set receivers to sandbox **personal** accounts (*Testing Tools → Sandbox Accounts*). `SANDBOX_RECEIVER_<FIRSTNAME>` pays that worker, so `SANDBOX_RECEIVER_SAM` pays Sam. Every other worker is spread across all the receivers you set (any `SANDBOX_RECEIVER_*`, plus the optional `PAYPAL_SANDBOX_RECEIVER_EMAIL`). With none set, payouts go to the seeded workers' fictional emails, and PayPal holds them as `UNCLAIMED`.
   4. Don't use your business account as the receiver: PayPal rejects paying yourself (`SELF_PAY_NOT_ALLOWED`).
 - **Gemini:** set `GOOGLE_GENERATIVE_AI_API_KEY` from [Google AI Studio](https://aistudio.google.com/apikey). Leave `AI_MODEL` empty to auto-pick.
 - **Bryntum:** `BRYNTUM_EMAIL` is only needed to install packages, not at runtime.

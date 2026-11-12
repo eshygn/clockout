@@ -249,7 +249,11 @@ export async function fillOpenShifts(opts: { onlyShiftIds?: string[] } = {}) {
       return true;
     };
 
-    for (const a of result.value.assignments) tryAssign(a.shiftId, a.workerId, a.reason, result.source);
+    // Apply the hardest-to-staff shifts first. If the model over-commits someone (say, past their hour cap),
+    // the shift only they can cover keeps them, and the guardrail planner refills an easier one.
+    const scarcity = new Map(open.map((o) => [o.id, candidatesFor(o, ctx).filter((c) => c.ok).length]));
+    const ordered = [...result.value.assignments].sort((x, y) => (scarcity.get(x.shiftId) ?? 99) - (scarcity.get(y.shiftId) ?? 99));
+    for (const a of ordered) tryAssign(a.shiftId, a.workerId, a.reason, result.source);
 
     // Anything the model left unfilled or got blocked on: the guardrail planner fills it legally.
     const stillOpen = live.filter((s) => s.status === "open" && open.some((o) => o.id === s.id));

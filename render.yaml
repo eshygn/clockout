@@ -21,9 +21,9 @@ services:
         sync: false
       - key: PAYPAL_CLIENT_SECRET
         sync: false
-      - key: PAYPAL_SANDBOX_RECEIVER_EMAIL
+      - key: SANDBOX_RECEIVER_SAM
         sync: false
-      - key: PAYPAL_SANDBOX_BUYER_EMAIL
+      - key: SANDBOX_RECEIVER_AVA
         sync: false
       - key: GOOGLE_GENERATIVE_AI_API_KEY
         sync: false

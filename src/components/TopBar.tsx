@@ -61,9 +61,12 @@ export function TopBar({
       </div>
 
       <div className="chips">
-        <span className={`chip chip-${status.ai.mode}`} title={status.ai.detail}>
+        <span
+          className={`chip chip-${status.ai.mode === "live" && status.ai.using !== "recorded" ? "live" : "recorded"}`}
+          title={status.ai.detail}
+        >
           <span className="chip-dot" />
-          AI · {status.ai.mode === "live" ? (status.ai.model ?? "Gemini") : "recorded"}
+          AI · {status.ai.mode === "live" ? (status.ai.using ?? "Gemini ready") : "recorded"}
         </span>
         <span className={`chip chip-${status.paypal.mode}`} title={status.paypal.detail}>
           <span className="chip-dot" />

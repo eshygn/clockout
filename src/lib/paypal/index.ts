@@ -56,22 +56,43 @@ export function paypalStatus(): { mode: "live" | "mock"; detail: string } {
 /**
  * Who actually receives a payout in live sandbox mode. The seeded workers' emails are
  * fictional, and PayPal holds money sent to an address with no account as UNCLAIMED.
- * So when PAYPAL_SANDBOX_RECEIVER_EMAIL (a sandbox *personal* account) is set, every
- * worker is paid there and payouts settle as SUCCESS. PAYPAL_SANDBOX_BUYER_EMAIL is used
- * the same way unless it is a business account (paying yourself fails with
- * SELF_PAY_NOT_ALLOWED). A deliberately typo'd address is always kept as-is, so the
- * unclaimed → cancel → retry flow is real too.
+ * So live payouts go to real sandbox *personal* accounts taken from the environment:
+ *   - SANDBOX_RECEIVER_<FIRSTNAME> pays that worker (SANDBOX_RECEIVER_SAM pays Sam);
+ *   - everyone else is spread across all configured receivers, in crew order
+ *     (any SANDBOX_RECEIVER_* plus the optional PAYPAL_SANDBOX_RECEIVER_EMAIL).
+ * A deliberately typo'd address is always kept as-is, so the unclaimed flow is real too.
  */
-export function sandboxReceiver(): string | null {
-  const explicit = process.env.PAYPAL_SANDBOX_RECEIVER_EMAIL?.trim();
-  if (explicit) return explicit;
-  const buyer = process.env.PAYPAL_SANDBOX_BUYER_EMAIL?.trim();
-  if (buyer && !/@business\.example\.com$/i.test(buyer)) return buyer;
-  return null;
+export function sandboxReceivers(env: Record<string, string | undefined> = process.env): {
+  byName: Record<string, string>;
+  pool: string[];
+} {
+  const byName: Record<string, string> = {};
+  for (const [k, v] of Object.entries(env)) {
+    const m = /^SANDBOX_RECEIVER_([A-Z]+)$/.exec(k);
+    if (m && v?.trim()) byName[m[1]] = v.trim();
+  }
+  const extra = env.PAYPAL_SANDBOX_RECEIVER_EMAIL?.trim();
+  const pool = [
+    ...new Set([
+      ...Object.keys(byName)
+        .sort()
+        .map((k) => byName[k]),
+      ...(extra ? [extra] : []),
+    ]),
+  ];
+  return { byName, pool };
 }
 
-export function receiverFor(email: string, mode: "live" | "mock", looksBad: boolean): string {
-  const sandbox = sandboxReceiver();
-  if (mode === "live" && sandbox && !looksBad) return sandbox;
-  return email;
+export function receiverFor(
+  worker: { name: string; paypalEmail: string },
+  workerIndex: number,
+  mode: "live" | "mock",
+  looksBad: boolean,
+  env: Record<string, string | undefined> = process.env,
+): string {
+  if (mode !== "live" || looksBad) return worker.paypalEmail;
+  const { byName, pool } = sandboxReceivers(env);
+  const first = worker.name.split(" ")[0].toUpperCase();
+  if (byName[first]) return byName[first];
+  return pool.length ? pool[workerIndex % pool.length] : worker.paypalEmail;
 }

@@ -35,7 +35,7 @@ Both problems sit between a message and a payment. AI is now good at the message
   - An event menu action hands a shift to the agent.
 - **AI: two forced tool calls, `record_constraints` and `assign_shifts`,** each validated by a zod schema. The model proposes; deterministic guardrails (role, unavailability, clashes, hour caps, budget) decide what's applied.
   - Responses are cached in SQLite, and calls are rate-limited for the free tier.
-  - When the newest Flash model is out of free quota, Clockout cascades down the Flash line. When nothing is left, it falls back to recorded responses, and a status chip says so.
+  - When the newest Flash model is rate-limited or overloaded, Clockout falls back to `gemini-2.5-flash`, then to recorded responses. A status chip names which one answered.
 - **PayPal:** the official `@paypal/paypal-server-sdk` handles OAuth, and Payouts v1 handles the money.
   - Batch create, status polling, item cancel for unclaimed payouts, and retry.
   - `sender_batch_id` provides idempotency.
@@ -45,7 +45,7 @@ Both problems sit between a message and a payment. AI is now good at the message
 
 ## Challenges we ran into
 
-- **Free-tier quotas.** Gemini's free tier differs per model and per day. Instead of hard-coding a model, Clockout lists the available Flash models and cascades through them on quota errors. It caches every answer so a re-run costs nothing, and falls back gracefully when the quota is gone.
+- **Free-tier quotas.** Gemini's free tier differs per model and per day. Clockout tries the newest Flash model, then `gemini-2.5-flash`, then recorded responses. It caches every answer so a re-run costs nothing, and falls back gracefully when the quota is gone.
 - **Two Bryntum products on one page.** The regular bundles refuse to load twice. Switching to the thin packages fixed that. Then the bundler tree-shook features we only named in config, and importing them explicitly fixed that too.
 - **Sandbox realism.** In live testing, payouts to our own business account failed with `SELF_PAY_NOT_ALLOWED`, and unknown addresses came back `UNCLAIMED`. We turned both into first-class, plain-English states with a retry. We also refused to re-send an unclaimed payout until PayPal confirms the cancel, so nobody gets paid twice. The sandbox's cancel endpoint returned `INTERNAL_SERVICE_ERROR` every time we tried, so in the sandbox that retry stays blocked, with an explanation on screen.
 - **Bryntum types versus runtime.** The resize validator receives `eventRecord` at runtime, while the type definitions say `record`. Following the types silently refused every resize until an end-to-end browser test caught it.

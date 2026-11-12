@@ -19,7 +19,7 @@ export function appState(): AppState {
     batches: getBatches(),
     items: getItems(),
     status: {
-      ai: { mode: ai.mode, model: ai.model, detail: ai.detail },
+      ai: { mode: ai.mode, model: ai.model, detail: ai.detail, using: ai.using },
       paypal: paypalStatus(),
       bryntum: { mode: "trial", detail: "Scheduler Pro + Calendar (thin trial packages)" },
     },

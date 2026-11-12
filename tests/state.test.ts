@@ -75,3 +75,22 @@ describe("PayPal error wording", async () => {
     expect(describeItemError(null)).toBeNull();
   });
 });
+
+describe("sandbox receivers and AI fallback chain", async () => {
+  const { receiverFor } = await import("@/lib/paypal");
+  const { fallbackChain } = await import("@/lib/ai");
+  const env = { SANDBOX_RECEIVER_SAM: "sam@personal.example.com", SANDBOX_RECEIVER_AVA: "ava@personal.example.com" };
+  it("pays a named worker their own receiver and spreads the rest", () => {
+    expect(receiverFor({ name: "Sam Whitfield", paypalEmail: "x@crew.example" }, 3, "live", false, env)).toBe("sam@personal.example.com");
+    expect(receiverFor({ name: "Maya Chen", paypalEmail: "x@crew.example" }, 0, "live", false, env)).toBe("ava@personal.example.com");
+    expect(receiverFor({ name: "Diego Ramírez", paypalEmail: "x@crew.example" }, 1, "live", false, env)).toBe("sam@personal.example.com");
+  });
+  it("keeps the typo'd address and never redirects in mock mode", () => {
+    expect(receiverFor({ name: "Jonah Brooks", paypalEmail: "j@gmial.com" }, 4, "live", true, env)).toBe("j@gmial.com");
+    expect(receiverFor({ name: "Maya Chen", paypalEmail: "x@crew.example" }, 0, "mock", false, env)).toBe("x@crew.example");
+  });
+  it("tries the newest Flash, then gemini-2.5-flash", () => {
+    expect(fallbackChain("gemini-3.8-flash")).toEqual(["gemini-3.8-flash", "gemini-2.5-flash"]);
+    expect(fallbackChain(null)).toEqual(["gemini-2.5-flash"]);
+  });
+});

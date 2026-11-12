@@ -76,10 +76,10 @@ These five files carry the product.
 
 - **`callTool()`** forces one named tool (`toolChoice: { type: "tool" }`) and parses the input with zod. It uses minimal thinking for speed and a 30s timeout.
 - **Cache:** a SQLite table keyed by a hash of the request. The cache survives **Reset**, so re-running the demo costs no quota.
-- **Model choice:** `AI_MODEL`, or the Gemini models list ranked newest stable Flash first, then Flash-Lite.
-  - On a 429 (quota), that model is parked for 5 minutes; on a 503 (overload), for 1 minute. Either way Clockout tries the next model.
+- **Model choice:** the newest stable Flash the API lists (or `AI_MODEL`), then `gemini-2.5-flash`.
+  - On a 429 (quota), that model is parked for 5 minutes; on a 503 (overload) or a timeout, for 1 minute. Either way Clockout tries the next model.
   - There's also a local per-minute cap.
-- **Fallback:** if nothing answers, the caller's recorded fallback is used, and `aiStatus()` tells the status chip why.
+- **Fallback:** if neither answers, the caller's recorded fallback is used. `aiStatus().using` names what answered the last call, and the status chip shows it.
 
 **Key decisions**
 
