@@ -75,4 +75,4 @@ Both problems sit between a message and a payment. AI is now good at the message
 
 `bryntum-scheduler-pro` · `bryntum-calendar` · `paypal-payouts` · `paypal-server-sdk` · `gemini` · `vercel-ai-sdk` · `zod` · `next.js` · `react` · `typescript` · `sqlite` · `better-sqlite3` · `vitest` · `render`
 
-**Links:** hosted demo (placeholder) · GitHub repo: https://github.com/eshygn/clockout · demo video: https://youtu.be/_yPhB6Wesl8
+**Links:** hosted demo: https://clockout-t8n8.onrender.com · GitHub repo: https://github.com/eshygn/clockout · demo video: https://youtu.be/_yPhB6Wesl8

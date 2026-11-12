@@ -14,7 +14,7 @@ Small businesses that run crews of freelancers (event staffing agencies, cleanin
 
 **Demo video (2 min, live Gemini and PayPal sandbox):** https://youtu.be/_yPhB6Wesl8
 
-**Hosted demo:** `https://clockout.onrender.com` *(placeholder: replace with the deployed URL)*
+**Hosted demo:** https://clockout-t8n8.onrender.com
 The free Render instance sleeps when idle. **The first load can take about a minute to wake up**; after that it's instant.
 
 **Run it locally in mock mode (no API keys needed)** with Node 20+. Bryntum's trial packages come from Bryntum's own npm registry, so the only thing you need is the email you registered a [Bryntum trial](https://bryntum.com/download/) with:
