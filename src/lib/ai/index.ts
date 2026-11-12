@@ -82,15 +82,21 @@ export function pickNewestFlash(names: string[]): string | null {
  * gemini-2.5-flash, then recorded responses. A model that is rate-limited or overloaded
  * is parked briefly and skipped.
  */
-export function fallbackChain(primary: string | null): string[] {
-  return [...new Set([primary ?? FALLBACK_MODEL, FALLBACK_MODEL])];
+export function fallbackChain(primary: string | null, listed: string[] = []): string[] {
+  // Fall back to models this key can actually call: the next two Flash models the API lists.
+  // gemini-2.5-flash is only the fallback when the listing is unavailable (it is retired for new keys).
+  const ranked = rankFlashModels(listed);
+  const first = primary ?? ranked[0] ?? FALLBACK_MODEL;
+  const rest = ranked.filter((m) => m !== first).slice(0, 2);
+  return [...new Set([first, ...(rest.length ? rest : [FALLBACK_MODEL])])];
 }
 
 async function candidateModels(): Promise<string[]> {
   const s = state();
   if (!s.candidates) {
-    let primary: string | null = process.env.AI_MODEL || null;
-    if (!primary) {
+    const primary: string | null = process.env.AI_MODEL || null;
+    let listed: string[] = [];
+    {
       try {
         const res = await fetch("https://generativelanguage.googleapis.com/v1beta/models?pageSize=1000", {
           headers: { "x-goog-api-key": process.env.GOOGLE_GENERATIVE_AI_API_KEY! },
@@ -98,12 +104,12 @@ async function candidateModels(): Promise<string[]> {
         });
         const json = (await res.json()) as { models?: { name: string; supportedGenerationMethods?: string[] }[] };
         const names = (json.models ?? []).filter((m) => m.supportedGenerationMethods?.includes("generateContent")).map((m) => m.name);
-        primary = pickNewestFlash(names);
+        listed = names;
       } catch {
-        primary = null;
+        listed = [];
       }
     }
-    s.candidates = fallbackChain(primary);
+    s.candidates = fallbackChain(primary, listed);
   }
   return s.candidates.filter((m) => (s.exhausted[m] ?? 0) < Date.now());
 }
@@ -198,6 +204,7 @@ async function callToolInner<S extends z.ZodType, T>(opts: ToolOpts<S, T>): Prom
     return { value: opts.fallback(), source: "recorded", cached: false };
   }
   const google = createGoogleGenerativeAI({ apiKey: process.env.GOOGLE_GENERATIVE_AI_API_KEY });
+  const retried = new Set<string>();
   for (const model of models) {
     if (!takeToken(s)) {
       s.detail = `Recorded: local limit of ${RPM} calls/min reached`;
@@ -244,6 +251,20 @@ async function callToolInner<S extends z.ZodType, T>(opts: ToolOpts<S, T>): Prom
         s.noMinimalThinking = [...(s.noMinimalThinking ?? []), model];
         models.splice(models.indexOf(model) + 1, 0, model);
         console.warn(`[ai] ${model} rejects minimal thinking; retrying without it`);
+        continue;
+      }
+      if (isOverloaded(e) && !retried.has(model)) {
+        // A 503 is usually momentary: give the same model one more go before moving down the chain.
+        retried.add(model);
+        models.splice(models.indexOf(model) + 1, 0, model);
+        console.warn(`[ai] ${model} is overloaded; retrying once`);
+        await new Promise((r) => setTimeout(r, 2000));
+        continue;
+      }
+      if (/no longer available|is not found|not supported for generateContent/i.test(String((e as Error).message))) {
+        // Retired or unknown model for this key: skip it for good and try the next one.
+        s.exhausted[model] = Number.MAX_SAFE_INTEGER;
+        console.warn(`[ai] ${model} is not available to this key; trying the next model`);
         continue;
       }
       if (isOverloaded(e) || /aborted due to timeout|timed? ?out/i.test(String((e as Error).message))) {

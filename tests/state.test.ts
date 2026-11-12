@@ -105,5 +105,8 @@ describe("sandbox receivers and AI fallback chain", async () => {
   it("tries the newest Flash, then gemini-2.5-flash", () => {
     expect(fallbackChain("gemini-3.8-flash")).toEqual(["gemini-3.8-flash", "gemini-2.5-flash"]);
     expect(fallbackChain(null)).toEqual(["gemini-2.5-flash"]);
+    const listed = ["models/gemini-2.5-flash", "models/gemini-3.8-flash", "models/gemini-3.7-flash", "models/gemini-3.5-flash-lite"];
+    expect(fallbackChain(null, listed)).toEqual(["gemini-3.8-flash", "gemini-3.7-flash", "gemini-2.5-flash"]);
+    expect(fallbackChain("gemini-3.5-flash-lite", listed)).toEqual(["gemini-3.5-flash-lite", "gemini-3.8-flash", "gemini-3.7-flash"]);
   });
 });
