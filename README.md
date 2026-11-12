@@ -12,6 +12,8 @@ Small businesses that run crews of freelancers (event staffing agencies, cleanin
 
 ## Judge quickstart
 
+**Demo video (2 min, live Gemini and PayPal sandbox):** https://youtu.be/_yPhB6Wesl8
+
 **Hosted demo:** `https://clockout.onrender.com` *(placeholder: replace with the deployed URL)*
 The free Render instance sleeps when idle. **The first load can take about a minute to wake up**; after that it's instant.
 
